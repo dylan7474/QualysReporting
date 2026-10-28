@@ -1570,12 +1570,23 @@
         document.getElementById('metricDataHealth').textContent = `${health.score}%`;
         document.getElementById('metricDataHealth').className = `text-2xl font-bold ${health.score > 90 ? 'text-teal-600' : health.score > 75 ? 'text-amber-500' : 'text-rose-600'}`;
 
-        document.getElementById('metricPendingReview').textContent = recon.newAssets.length;
-        document.getElementById('metricConflicts').textContent = recon.ownershipConflicts.length;
-        document.getElementById('metricMissingAssets').textContent = recon.missingAssets.length;
-        document.getElementById('metricChangedAssets').textContent = recon.changedAssets.length;
-        document.getElementById('metricActiveRisks').textContent = risks.length - expiredRisks.length;
-        document.getElementById('metricExpiredRisks').textContent = expiredRisks.length;
+        const elPendingReview = document.getElementById('metricPendingReview');
+        if (elPendingReview) elPendingReview.textContent = recon.newAssets.length;
+        
+        const elConflicts = document.getElementById('metricConflicts');
+        if (elConflicts) elConflicts.textContent = recon.ownershipConflicts.length;
+        
+        const elMissingAssets = document.getElementById('metricMissingAssets');
+        if (elMissingAssets) elMissingAssets.textContent = recon.missingAssets.length;
+        
+        const elChangedAssets = document.getElementById('metricChangedAssets');
+        if (elChangedAssets) elChangedAssets.textContent = recon.changedAssets.length;
+        
+        const elActiveRisks = document.getElementById('metricActiveRisks');
+        if (elActiveRisks) elActiveRisks.textContent = risks.length - expiredRisks.length;
+        
+        const elExpiredRisks = document.getElementById('metricExpiredRisks');
+        if (elExpiredRisks) elExpiredRisks.textContent = expiredRisks.length;
 
         this.updateCharts(register);
       }
