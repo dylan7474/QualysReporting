@@ -38,7 +38,8 @@
             <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Governance Report</button>
         </nav>
         <div class="p-4 border-t border-slate-700">
-            <button onclick="app.exportDatabase()" class="w-full bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded transition">💾 Backup DB (JSON)</button>
+            <button onclick="app.exportDatabase()" class="w-full bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded transition mb-2">💾 Backup DB (JSON)</button>
+            <button onclick="app.promptReset()" class="w-full bg-red-900/40 hover:bg-red-800/60 text-red-200 text-sm py-2 rounded transition border border-red-800/50">⚠️ Reset Database</button>
         </div>
     </aside>
 
@@ -355,6 +356,21 @@
             </div>
         </div>
 
+        <!-- Reset Confirmation Modal -->
+        <div id="modal-reset-confirm" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 z-50 flex items-center justify-center backdrop-blur-sm">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-center">
+                <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-red-100 mb-4">
+                    <svg class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Reset Database</h3>
+                <p class="text-gray-500 text-sm mb-6">Are you sure you want to completely erase all governance data, queues, and registers? This cannot be undone.</p>
+                <div class="flex justify-center space-x-3">
+                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
+                    <button onclick="app.executeReset()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium text-sm shadow transition">Erase Everything</button>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <script>
@@ -394,6 +410,10 @@
                 a.href = url;
                 a.download = `governance_backup_${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
+            }
+
+            static clearAll() {
+                Object.values(this.KEYS).forEach(key => localStorage.removeItem(key));
             }
         }
 
@@ -969,6 +989,7 @@
             closeModals() {
                 document.getElementById('modal-bulk-confirm').classList.add('hidden');
                 document.getElementById('modal-bulk-report').classList.add('hidden');
+                document.getElementById('modal-reset-confirm').classList.add('hidden');
             }
 
             approveQueueItem(id) {
@@ -1041,6 +1062,15 @@
 
             exportDatabase() {
                 StorageService.exportDatabase();
+            }
+
+            promptReset() {
+                document.getElementById('modal-reset-confirm').classList.remove('hidden');
+            }
+
+            executeReset() {
+                StorageService.clearAll();
+                window.location.reload(); // Reload to re-initialize with empty state (and seed data)
             }
         }
 
