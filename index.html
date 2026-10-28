@@ -8,6 +8,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js for Executive Analytics and Historian Trends -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- PapaParse for robust CSV Import -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>
@@ -63,6 +65,8 @@
           <button onclick="navigateTo('register')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" data-tab="register"><i data-lucide="database" class="w-4 h-4"></i><span>Asset Register</span></button>
           <button onclick="navigateTo('risks')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 relative" data-tab="risks"><i data-lucide="shield-alert" class="w-4 h-4"></i><span>Risk Register</span></button>
           <button onclick="navigateTo('reports')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" data-tab="reports"><i data-lucide="file-text" class="w-4 h-4"></i><span>Gov Report</span></button>
+          <div class="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-2 self-center"></div>
+          <button onclick="navigateTo('import')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1.5 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30" data-tab="import"><i data-lucide="upload-cloud" class="w-4 h-4"></i><span class="font-bold">Qualys Import</span></button>
         </nav>
 
         <!-- Right Quick Actions -->
@@ -87,6 +91,7 @@
       <button onclick="navigateTo('review')" class="mobile-nav-btn px-2.5 py-1.5 rounded-md font-medium whitespace-nowrap text-slate-600 dark:text-slate-300" data-tab="review">Queue</button>
       <button onclick="navigateTo('register')" class="mobile-nav-btn px-2.5 py-1.5 rounded-md font-medium whitespace-nowrap text-slate-600 dark:text-slate-300" data-tab="register">Register</button>
       <button onclick="navigateTo('reports')" class="mobile-nav-btn px-2.5 py-1.5 rounded-md font-medium whitespace-nowrap text-slate-600 dark:text-slate-300" data-tab="reports">Reports</button>
+      <button onclick="navigateTo('import')" class="mobile-nav-btn px-2.5 py-1.5 rounded-md font-bold whitespace-nowrap text-brand-600 dark:text-brand-400" data-tab="import">Import</button>
     </div>
   </header>
 
@@ -307,6 +312,85 @@
             <div><span class="text-slate-500 block text-xs">Assets Missing Service Tag</span><strong id="rptNoService" class="text-lg text-amber-600">0</strong></div>
             <div><span class="text-slate-500 block text-xs">Duplicate IPs Detected</span><strong id="rptDupIP" class="text-lg text-rose-600">0</strong></div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 8: QUALYS CSV IMPORT WIZARD -->
+    <section id="tab-import" class="tab-content hidden space-y-6">
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center"><i data-lucide="upload-cloud" class="w-6 h-6 mr-2 text-brand-500"></i> Qualys Asset Import Wizard</h2>
+        <p class="text-xs text-slate-500 mt-1">Directly import RFC4180-compliant CSV exports. Assets are deduplicated, normalized, and instantly reconciled.</p>
+      </div>
+
+      <!-- Step 1: Upload -->
+      <div id="wizard-step-1" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm transition-all">
+        <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-sm flex items-center"><span class="bg-brand-100 text-brand-700 rounded-full w-6 h-6 flex items-center justify-center mr-2">1</span> Upload Export CSV</h3>
+        <div class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center bg-slate-50 dark:bg-slate-800/30">
+          <i data-lucide="file-spreadsheet" class="w-10 h-10 text-slate-400 mx-auto mb-3"></i>
+          <input type="file" accept=".csv" id="qualysCsvUpload" onchange="ImportController.handleUpload(event)" class="block w-full max-w-sm mx-auto text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-600 file:text-white hover:file:bg-brand-700 cursor-pointer mb-2">
+          <p class="text-xs text-slate-500">Supports massive files (>5,000 rows). Parsing is done locally in your browser.</p>
+        </div>
+      </div>
+
+      <!-- Step 2: Mapping -->
+      <div id="wizard-step-2" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm hidden transition-all">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-bold text-slate-900 dark:text-white text-sm flex items-center"><span class="bg-brand-100 text-brand-700 rounded-full w-6 h-6 flex items-center justify-center mr-2">2</span> Preview & Map Columns</h3>
+          <button onclick="ImportController.reset()" class="text-xs font-semibold text-slate-500 hover:text-slate-700 underline">Cancel Import</button>
+        </div>
+        
+        <div class="overflow-x-auto max-h-64 border border-slate-200 dark:border-slate-700 rounded-lg mb-6 shadow-inner">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead id="preview-thead" class="bg-slate-100 dark:bg-slate-800 uppercase font-semibold text-slate-500 dark:text-slate-400 sticky top-0"></thead>
+            <tbody id="preview-tbody" class="divide-y divide-slate-200 dark:divide-slate-800 font-mono text-[11px]"></tbody>
+          </table>
+        </div>
+
+        <h4 class="font-bold text-sm mb-3 text-slate-900 dark:text-slate-100">Map Required Fields</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 mb-4" id="mapping-forms">
+          <!-- Dynamically populated fields -->
+        </div>
+        
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 gap-4">
+          <label class="flex items-center space-x-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
+            <input type="checkbox" id="saveMappingProfile" checked class="rounded border-slate-300 w-4 h-4 text-brand-600 focus:ring-brand-500">
+            <span>Save mapping profile for future imports</span>
+          </label>
+          <button onclick="ImportController.processImport()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-md transition flex items-center w-full sm:w-auto justify-center">
+            <i data-lucide="check-circle" class="w-4 h-4 mr-2"></i> Execute Final Import & Reconcile
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Results & Deduplication -->
+      <div id="wizard-step-3" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm hidden transition-all space-y-6">
+        <h3 class="font-bold text-slate-900 dark:text-white text-lg flex items-center text-emerald-600 dark:text-emerald-400"><i data-lucide="check-circle-2" class="w-6 h-6 mr-2"></i> Operational Import Complete</h3>
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"><span class="text-slate-500 block text-xs font-semibold">Total Rows Parsed</span><strong id="res-total" class="text-2xl font-black text-slate-800 dark:text-white">0</strong></div>
+          <div class="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl"><span class="text-emerald-700 dark:text-emerald-400 block text-xs font-semibold">Assets Imported</span><strong id="res-imported" class="text-2xl font-black text-emerald-700 dark:text-emerald-400">0</strong></div>
+          <div class="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl"><span class="text-amber-700 dark:text-amber-400 block text-xs font-semibold">Duplicates Resolved</span><strong id="res-dupes" class="text-2xl font-black text-amber-700 dark:text-amber-400">0</strong></div>
+          <div class="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl"><span class="text-rose-700 dark:text-rose-400 block text-xs font-semibold">Rows Rejected</span><strong id="res-rejected" class="text-2xl font-black text-rose-700 dark:text-rose-400">0</strong></div>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 dark:text-white mb-1 text-sm">Deduplication Report</h4>
+          <p class="text-xs text-slate-500 mb-3">Rows below resolved to the exact same normalized identity during import and were safely merged.</p>
+          <div class="overflow-x-auto max-h-64 border border-slate-200 dark:border-slate-700 rounded-lg">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 dark:bg-slate-800 font-semibold text-slate-600 dark:text-slate-300 sticky top-0">
+                <tr><th class="p-3 border-b border-slate-200 dark:border-slate-700">Normalized Identity</th><th class="p-3 border-b border-slate-200 dark:border-slate-700">Dropped Original Name (Duplicate)</th><th class="p-3 border-b border-slate-200 dark:border-slate-700">Authoritative Source Value Kept</th></tr>
+              </thead>
+              <tbody id="dedupe-tbody" class="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]"></tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800 mt-6">
+          <button onclick="navigateTo('review')" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-md transition flex items-center">
+            View Triage Queue <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+          </button>
         </div>
       </div>
     </section>
@@ -536,6 +620,187 @@
     class VulnerabilityImportService { static import(payload) { console.log("Placeholder"); } }
     class VulnerabilityRepository { static getAll() { return []; } }
     class RemediationPlanner { static generatePlan() { return []; } }
+
+
+    // --- PRIORITY 1: IMPORT WIZARD UI CONTROLLER (CSV PROCESSING) ---
+    class ImportController {
+      static rawData = [];
+      static headers = [];
+
+      static handleUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Show lightweight loading indicator on UI
+        document.getElementById('wizard-step-1').classList.add('opacity-50', 'pointer-events-none');
+        
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            document.getElementById('wizard-step-1').classList.remove('opacity-50', 'pointer-events-none');
+            
+            this.rawData = results.data;
+            this.headers = results.meta.fields;
+            
+            if (!this.headers || this.headers.length === 0) {
+              app.showToast('Invalid CSV format. No headers found.', 'error');
+              return;
+            }
+
+            this.renderPreview();
+            this.renderMapping();
+            
+            document.getElementById('wizard-step-1').classList.add('hidden');
+            document.getElementById('wizard-step-2').classList.remove('hidden');
+          },
+          error: (error) => {
+             document.getElementById('wizard-step-1').classList.remove('opacity-50', 'pointer-events-none');
+             app.showToast(`Error parsing CSV: ${error.message}`, 'error');
+          }
+        });
+      }
+
+      static renderPreview() {
+        const thead = document.getElementById('preview-thead');
+        const tbody = document.getElementById('preview-tbody');
+        
+        thead.innerHTML = '<tr>' + this.headers.map(h => `<th class="px-4 py-3 border-r border-slate-200 dark:border-slate-700 truncate max-w-[150px]" title="${h}">${h}</th>`).join('') + '</tr>';
+        
+        const previewData = this.rawData.slice(0, 20); // First 20 rows
+        tbody.innerHTML = previewData.map(row => 
+          '<tr>' + this.headers.map(h => `<td class="px-4 py-2 border-r border-slate-100 dark:border-slate-800 truncate max-w-[150px]" title="${row[h] || ''}">${row[h] || ''}</td>`).join('') + '</tr>'
+        ).join('');
+      }
+
+      static renderMapping() {
+        const requiredFields = [
+          { id: 'map_assetName', label: 'Asset Name (Primary Key)', req: true },
+          { id: 'map_ipAddress', label: 'IP Address' },
+          { id: 'map_os', label: 'Operating System' },
+          { id: 'map_tags', label: 'Asset Tags' },
+          { id: 'map_criticalityScore', label: 'Criticality Score' },
+          { id: 'map_truRiskScore', label: 'TruRisk Score' }
+        ];
+
+        const savedMapping = StorageService.get('QUALYS_CSV_MAPPING', {});
+        const container = document.getElementById('mapping-forms');
+        
+        container.innerHTML = requiredFields.map(f => {
+          const options = this.headers.map(h => `<option value="${h}" ${savedMapping[f.id] === h ? 'selected' : ''}>${h}</option>`).join('');
+          return `
+            <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-200 dark:border-slate-700">
+              <label class="block text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-2">${f.label} ${f.req ? '<span class="text-rose-500">*</span>' : ''}</label>
+              <select id="${f.id}" class="w-full text-xs font-semibold p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 focus:ring-brand-500 focus:border-brand-500">
+                <option value="">-- Ignore / Not Present --</option>
+                ${options}
+              </select>
+            </div>
+          `;
+        }).join('');
+      }
+
+      static processImport() {
+        const map = {
+          assetName: document.getElementById('map_assetName').value,
+          ipAddress: document.getElementById('map_ipAddress').value,
+          os: document.getElementById('map_os').value,
+          tags: document.getElementById('map_tags').value,
+          criticalityScore: document.getElementById('map_criticalityScore').value,
+          truRiskScore: document.getElementById('map_truRiskScore').value,
+        };
+
+        if (!map.assetName) {
+          app.showToast('Asset Name mapping is required.', 'error');
+          return;
+        }
+
+        if (document.getElementById('saveMappingProfile').checked) {
+          StorageService.set('QUALYS_CSV_MAPPING', map);
+        }
+
+        const dedupMap = new Map();
+        const duplicates = [];
+        let rejected = 0;
+
+        // Deduplication & Normalization Processing
+        this.rawData.forEach(row => {
+          const origName = row[map.assetName];
+          if (!origName || typeof origName !== 'string' || origName.trim() === '') {
+            rejected++; 
+            return; 
+          }
+          
+          const normName = AssetIdentityService.normalize(origName);
+          if (!normName) { rejected++; return; }
+
+          const assetObj = {
+            assetName: normName,
+            originalName: origName,
+            ipAddress: map.ipAddress ? (row[map.ipAddress] || '') : '',
+            os: map.os ? (row[map.os] || '') : '',
+            tags: map.tags ? (row[map.tags] || '') : '',
+            criticalityScore: map.criticalityScore ? (row[map.criticalityScore] || '') : '',
+            truRiskScore: map.truRiskScore ? (row[map.truRiskScore] || '') : ''
+          };
+
+          if (dedupMap.has(normName)) {
+             duplicates.push({ norm: normName, dropped: origName, kept: dedupMap.get(normName).originalName });
+          } else {
+             dedupMap.set(normName, assetObj);
+          }
+        });
+
+        const finalAssets = Array.from(dedupMap.values());
+        
+        // DIRECT INTEGRATION EXECUTION
+        StorageService.set('QUALYS_DISCOVERY', finalAssets);
+        const currentRegister = AssetRegisterService.getAll();
+        
+        // Feed directly into existing Reconciliation Engine
+        ReconciliationEngine.run(finalAssets, currentRegister);
+        
+        // Force sync entire UI state
+        app.renderAllViews();
+        
+        // Transition to Results Step
+        document.getElementById('wizard-step-2').classList.add('hidden');
+        document.getElementById('wizard-step-3').classList.remove('hidden');
+
+        // Populate Summary
+        document.getElementById('res-total').textContent = this.rawData.length.toLocaleString();
+        document.getElementById('res-imported').textContent = finalAssets.length.toLocaleString();
+        document.getElementById('res-dupes').textContent = duplicates.length.toLocaleString();
+        document.getElementById('res-rejected').textContent = rejected.toLocaleString();
+
+        // Build Deduplication Table
+        const dedupeBody = document.getElementById('dedupe-tbody');
+        if (duplicates.length === 0) {
+           dedupeBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-slate-400 italic">No duplicates detected in this batch. All identities were unique.</td></tr>';
+        } else {
+           dedupeBody.innerHTML = duplicates.map(d => `
+             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+               <td class="p-3 font-bold text-slate-800 dark:text-slate-200">${d.norm}</td>
+               <td class="p-3 text-rose-600 dark:text-rose-400 line-through decoration-rose-300 opacity-80">${d.dropped}</td>
+               <td class="p-3 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 rounded">${d.kept}</td>
+             </tr>
+           `).join('');
+        }
+        
+        lucide.createIcons();
+        app.showToast('Import completed. Reconciliation triggered automatically.', 'success');
+      }
+
+      static reset() {
+        this.rawData = [];
+        this.headers = [];
+        document.getElementById('qualysCsvUpload').value = '';
+        document.getElementById('wizard-step-1').classList.remove('hidden');
+        document.getElementById('wizard-step-2').classList.add('hidden');
+        document.getElementById('wizard-step-3').classList.add('hidden');
+      }
+    }
+
 
     // --- UI CONTROLLER ---
     class AppController {
