@@ -100,9 +100,12 @@
 
                         <!-- Step 2: Mapping / Validation -->
                         <div id="import-step-2" class="hidden space-y-6">
-                            <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800 flex justify-between items-center">
-                                <span><strong id="import-rows-detected">0</strong> rows detected. Auto-mapping applied.</span>
-                                <button onclick="app.importController.executeImport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow-sm font-medium">Execute Import & Reconcile</button>
+                            <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800 flex flex-col space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span><strong id="import-rows-detected">0</strong> asset rows detected. Auto-mapping applied.</span>
+                                    <button onclick="app.importController.executeImport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow-sm font-medium">Execute Import & Reconcile</button>
+                                </div>
+                                <div class="text-xs text-blue-700 font-medium">CSV Header located on row: <strong id="import-header-row">1</strong> <span class="font-normal text-blue-600">(Preceding report metadata skipped)</span></div>
                             </div>
                             
                             <div>
@@ -466,22 +469,65 @@
                 if (!file) return;
 
                 Papa.parse(file, {
-                    header: true,
+                    header: false, // Parse as raw arrays to manually detect header offset
                     skipEmptyLines: true,
                     complete: (results) => {
-                        this.parsedData = results.data;
-                        const headers = results.meta.fields;
+                        const rawData = results.data;
+                        let headerRowIndex = -1;
+                        let headers = [];
+
+                        // 1. Scan first 20 rows for the real Qualys header row
+                        for (let i = 0; i < Math.min(20, rawData.length); i++) {
+                            const row = rawData[i];
+                            // Look for Asset Name, Hostname, or similar identifying column
+                            const isHeader = row.some(cell => /^(asset.?name|hostname|dns.?hostname)$/i.test(String(cell).trim()));
+                            if (isHeader) {
+                                headerRowIndex = i;
+                                // Handle duplicate column names to match PapaParse header:true default behavior safely
+                                const seen = {};
+                                headers = row.map(h => {
+                                    let cleanH = String(h).trim();
+                                    if (seen[cleanH]) {
+                                        let count = 1;
+                                        while (seen[`${cleanH}_${count}`]) count++;
+                                        cleanH = `${cleanH}_${count}`;
+                                    }
+                                    seen[cleanH] = true;
+                                    return cleanH;
+                                });
+                                break;
+                            }
+                        }
+
+                        if (headerRowIndex === -1) {
+                            alert("CRITICAL: Could not detect a valid header row containing 'Asset Name' within the first 20 lines of the CSV.");
+                            return;
+                        }
+
+                        // 2. Parse remaining rows as objects utilizing the found headers
+                        this.parsedData = [];
+                        for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+                            const rowArray = rawData[i];
+                            const rowObj = {};
+                            headers.forEach((header, index) => {
+                                rowObj[header] = rowArray[index];
+                            });
+                            this.parsedData.push(rowObj);
+                        }
+
+                        // 3. Detect mappings on our dynamically discovered headers
                         this.mappedHeaders = QualysImportDefinition.detectMapping(headers);
-                        this.renderMappingStep(headers);
+                        this.renderMappingStep(headers, headerRowIndex + 1);
                     },
                     error: (err) => alert("Error parsing CSV: " + err.message)
                 });
             }
 
-            renderMappingStep(headers) {
+            renderMappingStep(headers, headerRowNum) {
                 document.getElementById('import-step-1').classList.add('hidden');
                 document.getElementById('import-step-2').classList.remove('hidden');
                 document.getElementById('import-rows-detected').textContent = this.parsedData.length;
+                if (headerRowNum) document.getElementById('import-header-row').textContent = headerRowNum;
                 
                 const tbody = document.getElementById('import-mapping-table');
                 tbody.innerHTML = '';
