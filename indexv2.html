@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Infrastructure Governance Portal</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PapaParse for robust CSV processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+    </style>
+</head>
+<body class="bg-gray-100 flex h-screen overflow-hidden text-gray-800">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col h-full shadow-lg z-10">
+        <div class="p-6 border-b border-slate-700">
+            <h1 class="text-xl font-bold tracking-tight text-blue-400">Governance Portal</h1>
+            <p class="text-xs text-slate-400 mt-1">Platform Infrastructure</p>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <button onclick="app.switchView('dashboard')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📊 Dashboard</button>
+            <button onclick="app.switchView('import')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📥 Import Qualys Data</button>
+            <button onclick="app.switchView('review')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition flex justify-between items-center">
+                <span>📋 Review Queue</span>
+                <span id="nav-review-badge" class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full hidden">0</span>
+            </button>
+            <button onclick="app.switchView('register')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🗄️ Asset Register</button>
+            <button onclick="app.switchView('health')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🩺 Data Health</button>
+            <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Governance Report</button>
+        </nav>
+        <div class="p-4 border-t border-slate-700">
+            <button onclick="app.exportDatabase()" class="w-full bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded transition">💾 Backup DB (JSON)</button>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50">
+        <!-- Header -->
+        <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-0">
+            <h2 id="page-title" class="text-2xl font-semibold text-gray-800">Dashboard</h2>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-500" id="last-sync-label">Last Sync: Never</span>
+            </div>
+        </header>
+
+        <!-- Dynamic Views -->
+        <div class="flex-1 overflow-y-auto p-8" id="view-container">
+            
+            <!-- VIEW: DASHBOARD -->
+            <section id="view-dashboard" class="view-section active space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- KPIs -->
+                    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                        <p class="text-sm text-gray-500 font-medium uppercase">Total Assets</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-total-assets">0</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-emerald-500">
+                        <p class="text-sm text-gray-500 font-medium uppercase">Platform Assets</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-platform-assets">0</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-amber-500">
+                        <p class="text-sm text-gray-500 font-medium uppercase">Pending Review</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-pending-review">0</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+                        <p class="text-sm text-gray-500 font-medium uppercase">Data Health Score</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-health-score">100%</p>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6 mt-8">
+                    <h3 class="text-lg font-semibold border-b pb-4 mb-4">Recommended Actions</h3>
+                    <ul id="dashboard-actions" class="space-y-3 text-sm text-gray-700">
+                        <li class="text-gray-500 italic">No pending actions. You're all caught up.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- VIEW: IMPORT WIZARD -->
+            <section id="view-import" class="view-section">
+                <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+                    <div class="p-8">
+                        <h3 class="text-xl font-semibold mb-2">Qualys Asset Import Wizard</h3>
+                        <p class="text-gray-600 mb-6 text-sm">Upload your RFC4180-compliant Qualys Asset Export CSV. The system will automatically map fields, deduplicate entries, and trigger reconciliation.</p>
+                        
+                        <!-- Step 1: Upload -->
+                        <div id="import-step-1" class="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:bg-gray-50 transition cursor-pointer">
+                            <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="app.importController.handleFileSelection(event)">
+                            <label for="csv-file-input" class="cursor-pointer flex flex-col items-center justify-center">
+                                <svg class="w-12 h-12 text-blue-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                <span class="font-medium text-gray-900">Click to upload CSV</span>
+                                <span class="text-sm text-gray-500 mt-1">Supports large Qualys exports (2000+ assets)</span>
+                            </label>
+                        </div>
+
+                        <!-- Step 2: Mapping / Validation -->
+                        <div id="import-step-2" class="hidden space-y-6">
+                            <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800 flex justify-between items-center">
+                                <span><strong id="import-rows-detected">0</strong> rows detected. Auto-mapping applied.</span>
+                                <button onclick="app.importController.executeImport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow-sm font-medium">Execute Import & Reconcile</button>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-medium mb-3 text-gray-800">Field Mapping Verification</h4>
+                                <div class="overflow-x-auto border rounded-lg">
+                                    <table class="min-w-full text-sm text-left">
+                                        <thead class="bg-gray-100 text-gray-700">
+                                            <tr>
+                                                <th class="py-2 px-4 border-b">System Field</th>
+                                                <th class="py-2 px-4 border-b">Detected CSV Column</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="import-mapping-table" class="divide-y">
+                                            <!-- Mappings injected here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Results -->
+                        <div id="import-step-3" class="hidden space-y-6">
+                            <div class="bg-emerald-50 border border-emerald-200 rounded p-6 text-center">
+                                <svg class="w-12 h-12 text-emerald-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                <h4 class="text-lg font-bold text-emerald-800">Import & Reconciliation Complete</h4>
+                                <p class="text-emerald-700 text-sm mt-1">The workflow executed successfully.</p>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold" id="res-imported">0</p><p class="text-xs text-gray-500 uppercase">Imported</p></div>
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-amber-600" id="res-dupes">0</p><p class="text-xs text-gray-500 uppercase">Duplicates Merged</p></div>
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-blue-600" id="res-new">0</p><p class="text-xs text-gray-500 uppercase">New in Queue</p></div>
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-red-600" id="res-missing">0</p><p class="text-xs text-gray-500 uppercase">Missing Assets</p></div>
+                            </div>
+                            <button onclick="app.switchView('review')" class="w-full bg-slate-800 text-white py-3 rounded hover:bg-slate-700 font-medium">Go to Review Queue</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: REVIEW QUEUE -->
+            <section id="view-review" class="view-section h-full flex flex-col">
+                <div class="flex justify-between items-end mb-4">
+                    <h3 class="text-xl font-semibold">Triage Queue</h3>
+                    <div class="space-x-2">
+                        <select id="review-filter-state" class="border-gray-300 rounded text-sm px-3 py-1.5" onchange="app.renderReviewQueue()">
+                            <option value="PENDING">Pending (New)</option>
+                            <option value="IN_REVIEW">In Review</option>
+                            <option value="ESCALATED">Escalated</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-gray-100 text-gray-600 border-b">
+                                <tr>
+                                    <th class="px-6 py-3">Asset Identity</th>
+                                    <th class="px-6 py-3">Suggested Owner</th>
+                                    <th class="px-6 py-3">Service Infer.</th>
+                                    <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="review-queue-tbody" class="divide-y">
+                                <!-- Queue items go here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: ASSET REGISTER -->
+            <section id="view-register" class="view-section h-full flex flex-col">
+                <div class="flex justify-between items-end mb-4">
+                    <h3 class="text-xl font-semibold">Authoritative Register</h3>
+                    <input type="text" id="register-search" placeholder="Search assets..." class="border-gray-300 rounded-md shadow-sm text-sm px-4 py-2 w-64" oninput="app.renderRegister()">
+                </div>
+                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col">
+                    <div class="overflow-y-auto flex-1">
+                        <table class="min-w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-gray-100 text-gray-600 border-b sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-6 py-3">Normalized Name</th>
+                                    <th class="px-6 py-3">Owner</th>
+                                    <th class="px-6 py-3">Service</th>
+                                    <th class="px-6 py-3">Env</th>
+                                    <th class="px-6 py-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="register-tbody" class="divide-y">
+                                <!-- Register items go here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: DATA HEALTH -->
+            <section id="view-health" class="view-section">
+                 <h3 class="text-xl font-semibold mb-6">Governance Data Health</h3>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div class="bg-white shadow rounded-lg p-6">
+                         <h4 class="font-medium text-red-600 border-b pb-2 mb-3">Missing Ownership</h4>
+                         <ul id="health-missing-owner" class="text-sm space-y-2 text-gray-700 max-h-48 overflow-y-auto"></ul>
+                     </div>
+                     <div class="bg-white shadow rounded-lg p-6">
+                         <h4 class="font-medium text-amber-600 border-b pb-2 mb-3">Unclassified Services</h4>
+                         <ul id="health-missing-service" class="text-sm space-y-2 text-gray-700 max-h-48 overflow-y-auto"></ul>
+                     </div>
+                 </div>
+            </section>
+
+            <!-- VIEW: REPORTS -->
+            <section id="view-reports" class="view-section">
+                <div class="bg-white rounded-lg shadow p-8 max-w-4xl mx-auto">
+                    <div class="flex justify-between items-center mb-8 border-b pb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold">Executive Governance Report</h2>
+                            <p class="text-gray-500 text-sm mt-1" id="report-date"></p>
+                        </div>
+                        <button onclick="window.print()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded text-sm font-medium transition">🖨️ Print PDF</button>
+                    </div>
+                    
+                    <div class="space-y-8">
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">1. Estate Summary</h3>
+                            <div class="grid grid-cols-3 gap-4 text-center">
+                                <div class="p-4 bg-slate-50 rounded"><p class="text-2xl font-bold text-slate-700" id="rpt-total">0</p><p class="text-xs uppercase text-slate-500">Total Governed Assets</p></div>
+                                <div class="p-4 bg-blue-50 rounded"><p class="text-2xl font-bold text-blue-700" id="rpt-platform">0</p><p class="text-xs uppercase text-blue-500">Platform Owned</p></div>
+                                <div class="p-4 bg-gray-50 rounded"><p class="text-2xl font-bold text-gray-700" id="rpt-other">0</p><p class="text-xs uppercase text-gray-500">Other (Corp/Nops)</p></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">2. Operations & Triage</h3>
+                            <ul class="list-disc pl-5 space-y-2 text-sm text-gray-700">
+                                <li><strong id="rpt-queue">0</strong> assets currently sitting in the triage queue awaiting classification.</li>
+                                <li><strong id="rpt-health">100%</strong> data health integrity score across the current estate.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // CORE ARCHITECTURE & SERVICES
+        // ==========================================
+
+        class StorageService {
+            static KEYS = {
+                ASSET_REGISTER: 'gov_asset_register',
+                REVIEW_QUEUE: 'gov_review_queue',
+                OWNERSHIP_LEDGER: 'gov_ownership_ledger',
+                RECONCILIATION_RUNS: 'gov_recon_runs'
+            };
+
+            static load(key) {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : [];
+            }
+
+            static save(key, data) {
+                localStorage.setItem(key, JSON.stringify(data));
+            }
+
+            static exportDatabase() {
+                const db = {
+                    assetRegister: this.load(this.KEYS.ASSET_REGISTER),
+                    reviewQueue: this.load(this.KEYS.REVIEW_QUEUE),
+                    ownershipLedger: this.load(this.KEYS.OWNERSHIP_LEDGER),
+                    reconciliationRuns: this.load(this.KEYS.RECONCILIATION_RUNS),
+                    exportDate: new Date().toISOString(),
+                    version: '2.0'
+                };
+                const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `governance_backup_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+            }
+        }
+
+        class AssetIdentityService {
+            static normalize(name) {
+                if (!name) return 'unknown-asset';
+                let n = String(name).toLowerCase().trim();
+                const domains = ['.piiplat.net', '.peiplat.net', '.back.peiplat.net', '.local'];
+                domains.forEach(d => {
+                    if (n.endsWith(d)) n = n.slice(0, -d.length);
+                });
+                return n.replace(/\.+$/, '').replace(/\s+/g, '-');
+            }
+        }
+
+        class ServiceClassificationEngine {
+            static infer(name, tags = '') {
+                const n = String(name).toLowerCase();
+                const t = String(tags).toLowerCase();
+                
+                if (n.includes('dc-') || n.includes('adds')) return 'Active Directory';
+                if (n.includes('dns')) return 'DNS';
+                if (n.includes('dhcp')) return 'DHCP';
+                if (n.includes('smtp') || n.includes('mail')) return 'SMTP';
+                if (n.includes('sql') || n.includes('db') || n.includes('zdb')) return 'Database';
+                if (n.includes('zbx') || n.includes('graf') || t.includes('monitoring')) return 'Monitoring';
+                if (n.includes('veeam') || n.includes('backv')) return 'Backup';
+                
+                return 'Unclassified';
+            }
+        }
+
+        class QualysImportDefinition {
+            // Regex patterns to auto-map Qualys headers safely
+            static FIELD_MAPPINGS = {
+                assetId: /^(asset.?id|id)$/i,
+                hostId: /^host.?id$/i,
+                uuid: /^(hardware.?uuid|uuid)$/i,
+                assetName: /^(asset.?name|hostname|dns.?hostname)$/i,
+                ipAddress: /^(ip|ipv4|ip.?address(es)?)$/i,
+                operatingSystem: /^(os|operating.?system)$/i,
+                tags: /^(tags|asset.?tags)$/i,
+                criticalityScore: /^criticality(.?score)?$/i,
+                truRiskScore: /^trurisk(.?score)?$/i
+            };
+
+            static detectMapping(headers) {
+                const map = {};
+                headers.forEach((h, index) => {
+                    for (const [sysKey, regex] of Object.entries(this.FIELD_MAPPINGS)) {
+                        if (!map[sysKey] && regex.test(h.trim())) {
+                            map[sysKey] = index;
+                        }
+                    }
+                });
+                return map;
+            }
+        }
+
+        class ReviewQueueService {
+            static STATES = { PENDING: 'PENDING', IN_REVIEW: 'IN_REVIEW', APPROVED: 'APPROVED', REJECTED: 'REJECTED', ESCALATED: 'ESCALATED' };
+
+            static getQueue() {
+                return StorageService.load(StorageService.KEYS.REVIEW_QUEUE);
+            }
+
+            static enqueue(asset, reason) {
+                const queue = this.getQueue();
+                const existing = queue.find(q => q.normalizedName === asset.normalizedName);
+                if (!existing) {
+                    queue.push({
+                        id: 'REQ-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                        normalizedName: asset.normalizedName,
+                        originalName: asset.assetName,
+                        ipAddress: asset.ipAddress,
+                        detectedService: asset.inferredService,
+                        status: this.STATES.PENDING,
+                        reason: reason,
+                        addedDate: new Date().toISOString(),
+                        qualysData: asset
+                    });
+                    StorageService.save(StorageService.KEYS.REVIEW_QUEUE, queue);
+                    return true;
+                }
+                return false;
+            }
+
+            static resolve(id, finalOwner, finalService, decisionStatus) {
+                let queue = this.getQueue();
+                const itemIdx = queue.findIndex(q => q.id === id);
+                if (itemIdx === -1) return;
+
+                const item = queue[itemIdx];
+                item.status = decisionStatus;
+                item.resolvedDate = new Date().toISOString();
+                
+                // Remove from queue completely if resolved
+                queue.splice(itemIdx, 1);
+                StorageService.save(StorageService.KEYS.REVIEW_QUEUE, queue);
+
+                // Add to register
+                if (decisionStatus === this.STATES.APPROVED) {
+                    const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                    const existingIdx = register.findIndex(r => r.normalizedName === item.normalizedName);
+                    
+                    const newRecord = {
+                        normalizedName: item.normalizedName,
+                        originalName: item.originalName,
+                        owner: finalOwner,
+                        service: finalService,
+                        status: 'Approved',
+                        environment: 'Production', // Default
+                        decisionDate: new Date().toISOString(),
+                        lastSeen: new Date().toISOString()
+                    };
+
+                    if (existingIdx >= 0) register[existingIdx] = { ...register[existingIdx], ...newRecord };
+                    else register.push(newRecord);
+
+                    StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
+                }
+            }
+        }
+
+        class ReconciliationEngine {
+            static run(importedAssets) {
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const registerKeys = new Set(register.map(r => r.normalizedName));
+                
+                let newCount = 0;
+                let dedupeCount = 0;
+                let totalProcessed = 0;
+
+                const uniqueAssets = new Map(); // Hierarchical deduplication by identity
+
+                // 1. Deduplicate incoming payload
+                importedAssets.forEach(a => {
+                    if (uniqueAssets.has(a.normalizedName)) {
+                        dedupeCount++;
+                    } else {
+                        uniqueAssets.set(a.normalizedName, a);
+                    }
+                });
+
+                // 2. Reconcile against authoritative register
+                uniqueAssets.forEach(asset => {
+                    totalProcessed++;
+                    if (!registerKeys.has(asset.normalizedName)) {
+                        // New Asset -> Queue
+                        const added = ReviewQueueService.enqueue(asset, "Newly discovered in Qualys");
+                        if (added) newCount++;
+                    } else {
+                        // Existing Asset -> Update last seen (In future: run drift detection here)
+                        const regItem = register.find(r => r.normalizedName === asset.normalizedName);
+                        if (regItem) {
+                            regItem.lastSeen = new Date().toISOString();
+                        }
+                    }
+                });
+
+                // Save updated last seen
+                StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
+
+                return { totalProcessed, dedupeCount, newCount, missingCount: 0 }; // missing logic deferred for simplicity
+            }
+        }
+
+        class ImportController {
+            constructor(appRef) {
+                this.app = appRef;
+                this.parsedData = [];
+                this.mappedHeaders = {};
+            }
+
+            handleFileSelection(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        this.parsedData = results.data;
+                        const headers = results.meta.fields;
+                        this.mappedHeaders = QualysImportDefinition.detectMapping(headers);
+                        this.renderMappingStep(headers);
+                    },
+                    error: (err) => alert("Error parsing CSV: " + err.message)
+                });
+            }
+
+            renderMappingStep(headers) {
+                document.getElementById('import-step-1').classList.add('hidden');
+                document.getElementById('import-step-2').classList.remove('hidden');
+                document.getElementById('import-rows-detected').textContent = this.parsedData.length;
+                
+                const tbody = document.getElementById('import-mapping-table');
+                tbody.innerHTML = '';
+
+                Object.keys(QualysImportDefinition.FIELD_MAPPINGS).forEach(sysKey => {
+                    const mappedIndex = this.mappedHeaders[sysKey];
+                    const csvHeader = mappedIndex !== undefined ? headers[mappedIndex] : '<span class="text-red-500">Not Found</span>';
+                    
+                    const row = `<tr>
+                        <td class="py-2 px-4 border-b font-mono text-xs">${sysKey}</td>
+                        <td class="py-2 px-4 border-b font-mono text-xs bg-gray-50">${csvHeader}</td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+            }
+
+            executeImport() {
+                if (this.mappedHeaders.assetName === undefined) {
+                    alert("CRITICAL: Cannot import without an Asset Name mapping.");
+                    return;
+                }
+
+                // Transform raw CSV rows to Internal Model
+                const transformed = this.parsedData.map(row => {
+                    const keys = Object.keys(row);
+                    const rawName = row[keys[this.mappedHeaders.assetName]];
+                    const rawTags = this.mappedHeaders.tags !== undefined ? row[keys[this.mappedHeaders.tags]] : '';
+                    
+                    return {
+                        assetName: rawName,
+                        normalizedName: AssetIdentityService.normalize(rawName),
+                        ipAddress: this.mappedHeaders.ipAddress !== undefined ? row[keys[this.mappedHeaders.ipAddress]] : '',
+                        operatingSystem: this.mappedHeaders.operatingSystem !== undefined ? row[keys[this.mappedHeaders.operatingSystem]] : '',
+                        tags: rawTags,
+                        inferredService: ServiceClassificationEngine.infer(rawName, rawTags)
+                    };
+                }).filter(a => a.normalizedName !== 'unknown-asset' && a.normalizedName !== '');
+
+                // Pass to Reconciliation Engine
+                const results = ReconciliationEngine.run(transformed);
+
+                // Show Results
+                document.getElementById('import-step-2').classList.add('hidden');
+                document.getElementById('import-step-3').classList.remove('hidden');
+                
+                document.getElementById('res-imported').textContent = results.totalProcessed;
+                document.getElementById('res-dupes').textContent = results.dedupeCount;
+                document.getElementById('res-new').textContent = results.newCount;
+                document.getElementById('res-missing').textContent = results.missingCount;
+
+                this.app.updateGlobalBadges();
+            }
+        }
+
+        // ==========================================
+        // MAIN APP CONTROLLER
+        // ==========================================
+
+        class App {
+            constructor() {
+                this.importController = new ImportController(this);
+                // Seed some demo register data if completely empty
+                if (StorageService.load(StorageService.KEYS.ASSET_REGISTER).length === 0) {
+                    StorageService.save(StorageService.KEYS.ASSET_REGISTER, [
+                        { normalizedName: 'mkn1piipgraf01', originalName: 'mkn1piipgraf01.piiplat.net', owner: 'Platform', service: 'Monitoring', environment: 'Prod', status: 'Approved' },
+                        { normalizedName: 'dc-01-core', originalName: 'dc-01-core.local', owner: 'CORP', service: 'Active Directory', environment: 'Prod', status: 'Approved' }
+                    ]);
+                }
+            }
+
+            init() {
+                this.updateGlobalBadges();
+                this.switchView('dashboard');
+                document.getElementById('report-date').textContent = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', day: 'numeric' });
+            }
+
+            switchView(viewId) {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                document.getElementById('view-' + viewId).classList.add('active');
+                
+                const titles = {
+                    'dashboard': 'Executive Dashboard',
+                    'import': 'Data Ingestion',
+                    'review': 'Triage & Review Queue',
+                    'register': 'Authoritative Asset Register',
+                    'health': 'Data Integrity & Health',
+                    'reports': 'Governance Reports'
+                };
+                document.getElementById('page-title').textContent = titles[viewId];
+
+                if (viewId === 'dashboard') this.renderDashboard();
+                if (viewId === 'review') this.renderReviewQueue();
+                if (viewId === 'register') this.renderRegister();
+                if (viewId === 'health') this.renderHealth();
+                if (viewId === 'reports') this.renderReports();
+            }
+
+            updateGlobalBadges() {
+                const q = ReviewQueueService.getQueue().filter(x => x.status === 'PENDING' || x.status === 'IN_REVIEW');
+                const b = document.getElementById('nav-review-badge');
+                if (q.length > 0) {
+                    b.textContent = q.length;
+                    b.classList.remove('hidden');
+                } else {
+                    b.classList.add('hidden');
+                }
+            }
+
+            renderDashboard() {
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const queue = ReviewQueueService.getQueue().filter(x => x.status === 'PENDING' || x.status === 'IN_REVIEW');
+                
+                document.getElementById('kpi-total-assets').textContent = register.length;
+                document.getElementById('kpi-platform-assets').textContent = register.filter(r => r.owner === 'Platform').length;
+                document.getElementById('kpi-pending-review').textContent = queue.length;
+                
+                const missingOwner = register.filter(r => !r.owner || r.owner === 'Unknown').length;
+                document.getElementById('kpi-health-score').textContent = missingOwner === 0 ? '100%' : Math.round(((register.length - missingOwner) / register.length) * 100) + '%';
+
+                const actionsList = document.getElementById('dashboard-actions');
+                actionsList.innerHTML = '';
+                if (queue.length > 0) actionsList.innerHTML += `<li>🔴 <button onclick="app.switchView('review')" class="text-blue-600 hover:underline cursor-pointer font-medium">${queue.length} assets</button> await ownership triage in the queue.</li>`;
+                if (missingOwner > 0) actionsList.innerHTML += `<li>🟡 <button onclick="app.switchView('health')" class="text-blue-600 hover:underline cursor-pointer font-medium">${missingOwner} approved assets</button> are missing an owner assignment.</li>`;
+                if (queue.length === 0 && missingOwner === 0) actionsList.innerHTML = '<li class="text-gray-500 italic">No pending actions. You\'re all caught up.</li>';
+            }
+
+            renderReviewQueue() {
+                const stateFilter = document.getElementById('review-filter-state').value;
+                const queue = ReviewQueueService.getQueue().filter(q => q.status === stateFilter);
+                const tbody = document.getElementById('review-queue-tbody');
+                tbody.innerHTML = '';
+
+                if (queue.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 italic">No assets currently in ${stateFilter} state.</td></tr>`;
+                    return;
+                }
+
+                queue.forEach(item => {
+                    // Pre-select Platform if inferred service strongly matches
+                    const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(item.detectedService);
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="font-medium text-gray-900">${item.normalizedName}</div>
+                            <div class="text-xs text-gray-500 font-mono">${item.ipAddress || 'No IP'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <select id="own-${item.id}" class="border-gray-300 rounded text-sm px-2 py-1">
+                                <option value="Platform" ${isPlatformService ? 'selected' : ''}>Platform</option>
+                                <option value="CORP" ${!isPlatformService && item.detectedService === 'Active Directory' ? 'selected' : ''}>CORP</option>
+                                <option value="NOPS">NOPS</option>
+                            </select>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">${item.detectedService}</span>
+                        </td>
+                        <td class="px-6 py-4 text-xs font-semibold ${item.status==='PENDING'?'text-blue-600':''}">${item.status}</td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="app.approveQueueItem('${item.id}')" class="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-emerald-700">Approve</button>
+                            <button onclick="app.rejectQueueItem('${item.id}')" class="bg-red-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-700">Reject</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            approveQueueItem(id) {
+                const owner = document.getElementById(`own-${id}`).value;
+                const queueItem = ReviewQueueService.getQueue().find(q => q.id === id);
+                ReviewQueueService.resolve(id, owner, queueItem.detectedService, ReviewQueueService.STATES.APPROVED);
+                this.updateGlobalBadges();
+                this.renderReviewQueue();
+            }
+            
+            rejectQueueItem(id) {
+                ReviewQueueService.resolve(id, 'Unknown', 'Unknown', ReviewQueueService.STATES.REJECTED);
+                this.updateGlobalBadges();
+                this.renderReviewQueue();
+            }
+
+            renderRegister() {
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const query = document.getElementById('register-search').value.toLowerCase();
+                const tbody = document.getElementById('register-tbody');
+                tbody.innerHTML = '';
+
+                const filtered = register.filter(r => 
+                    r.normalizedName.toLowerCase().includes(query) || 
+                    (r.owner && r.owner.toLowerCase().includes(query))
+                );
+
+                filtered.forEach(r => {
+                    const tr = `<tr>
+                        <td class="px-6 py-3 font-medium text-slate-800">${r.normalizedName}</td>
+                        <td class="px-6 py-3"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-semibold">${r.owner || 'Unassigned'}</span></td>
+                        <td class="px-6 py-3 text-slate-600 text-sm">${r.service || 'Unknown'}</td>
+                        <td class="px-6 py-3 text-slate-500 text-sm">${r.environment || 'Prod'}</td>
+                        <td class="px-6 py-3"><span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded">${r.status || 'Active'}</span></td>
+                    </tr>`;
+                    tbody.innerHTML += tr;
+                });
+            }
+
+            renderHealth() {
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const listOwner = document.getElementById('health-missing-owner');
+                const listService = document.getElementById('health-missing-service');
+                
+                listOwner.innerHTML = '';
+                listService.innerHTML = '';
+
+                const missingOwners = register.filter(r => !r.owner || r.owner === 'Unknown');
+                const missingServices = register.filter(r => !r.service || r.service === 'Unclassified' || r.service === 'Unknown');
+
+                if (missingOwners.length === 0) listOwner.innerHTML = '<li class="text-emerald-600">✅ All assets have assigned owners.</li>';
+                missingOwners.forEach(r => listOwner.innerHTML += `<li>• ${r.normalizedName}</li>`);
+
+                if (missingServices.length === 0) listService.innerHTML = '<li class="text-emerald-600">✅ All assets have classified services.</li>';
+                missingServices.forEach(r => listService.innerHTML += `<li>• ${r.normalizedName}</li>`);
+            }
+
+            renderReports() {
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                document.getElementById('rpt-total').textContent = register.length;
+                document.getElementById('rpt-platform').textContent = register.filter(r => r.owner === 'Platform').length;
+                document.getElementById('rpt-other').textContent = register.filter(r => r.owner !== 'Platform').length;
+                
+                const q = ReviewQueueService.getQueue().filter(x => x.status === 'PENDING' || x.status === 'IN_REVIEW');
+                document.getElementById('rpt-queue').textContent = q.length;
+                
+                const missingOwner = register.filter(r => !r.owner || r.owner === 'Unknown').length;
+                document.getElementById('rpt-health').textContent = missingOwner === 0 ? '100%' : Math.round(((register.length - missingOwner) / register.length) * 100) + '%';
+            }
+
+            exportDatabase() {
+                StorageService.exportDatabase();
+            }
+        }
+
+        // Boot Application
+        window.onload = () => {
+            window.app = new App();
+            app.init();
+        };
+    </script>
+</body>
+</html>
