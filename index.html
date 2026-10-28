@@ -10,8 +10,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .view-section { display: none; }
-        .view-section.active { display: block; }
+        /* 
+         * FIX: Added :not(.active) and !important. 
+         * This strictly enforces hiding inactive sections and prevents 
+         * Tailwind's display utilities (like .flex) from overriding the hidden state.
+         */
+        .view-section:not(.active) { display: none !important; }
     </style>
 </head>
 <body class="bg-gray-100 flex h-screen overflow-hidden text-gray-800">
@@ -148,7 +152,7 @@
             <!-- VIEW: REVIEW QUEUE -->
             <section id="view-review" class="view-section h-full flex flex-col">
                 <div class="flex justify-between items-end mb-4">
-                    <h3 class="text-xl font-semibold">Triage Queue</h3>
+                    <h3 class="text-xl font-semibold">Triage & Review Queue</h3>
                 </div>
                 
                 <!-- Analytics Cards -->
