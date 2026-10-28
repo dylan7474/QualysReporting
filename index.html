@@ -10,11 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        /* 
-         * FIX: Added :not(.active) and !important. 
-         * This strictly enforces hiding inactive sections and prevents 
-         * Tailwind's display utilities (like .flex) from overriding the hidden state.
-         */
+        /* Strictly enforces hiding inactive sections */
         .view-section:not(.active) { display: none !important; }
     </style>
 </head>
@@ -219,7 +215,7 @@
                 </div>
 
                 <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col border border-gray-200">
-                    <div class="overflow-y-auto flex-1">
+                    <div class="overflow-auto flex-1">
                         <table class="min-w-full text-left text-sm whitespace-nowrap">
                             <thead class="bg-gray-100 text-gray-600 border-b sticky top-0 z-10">
                                 <tr>
@@ -247,8 +243,8 @@
                     <h3 class="text-xl font-semibold">Authoritative Register</h3>
                     <input type="text" id="register-search" placeholder="Search assets..." class="border-gray-300 rounded-md shadow-sm text-sm px-4 py-2 w-64" oninput="app.renderRegister()">
                 </div>
-                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col">
-                    <div class="overflow-y-auto flex-1">
+                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col border border-gray-200">
+                    <div class="overflow-auto flex-1">
                         <table class="min-w-full text-left text-sm whitespace-nowrap">
                             <thead class="bg-gray-100 text-gray-600 border-b sticky top-0 z-10">
                                 <tr>
@@ -257,6 +253,7 @@
                                     <th class="px-6 py-3">Service</th>
                                     <th class="px-6 py-3">Env</th>
                                     <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="register-tbody" class="divide-y">
@@ -271,11 +268,11 @@
             <section id="view-health" class="view-section">
                  <h3 class="text-xl font-semibold mb-6">Governance Data Health</h3>
                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div class="bg-white shadow rounded-lg p-6">
+                     <div class="bg-white shadow rounded-lg p-6 border border-gray-200">
                          <h4 class="font-medium text-red-600 border-b pb-2 mb-3">Missing Ownership</h4>
                          <ul id="health-missing-owner" class="text-sm space-y-2 text-gray-700 max-h-48 overflow-y-auto"></ul>
                      </div>
-                     <div class="bg-white shadow rounded-lg p-6">
+                     <div class="bg-white shadow rounded-lg p-6 border border-gray-200">
                          <h4 class="font-medium text-amber-600 border-b pb-2 mb-3">Unclassified Services</h4>
                          <ul id="health-missing-service" class="text-sm space-y-2 text-gray-700 max-h-48 overflow-y-auto"></ul>
                      </div>
@@ -284,7 +281,7 @@
 
             <!-- VIEW: REPORTS -->
             <section id="view-reports" class="view-section">
-                <div class="bg-white rounded-lg shadow p-8 max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow p-8 max-w-4xl mx-auto border border-gray-200">
                     <div class="flex justify-between items-center mb-8 border-b pb-4">
                         <div>
                             <h2 class="text-2xl font-bold">Executive Governance Report</h2>
@@ -297,9 +294,9 @@
                         <div>
                             <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">1. Estate Summary</h3>
                             <div class="grid grid-cols-3 gap-4 text-center">
-                                <div class="p-4 bg-slate-50 rounded"><p class="text-2xl font-bold text-slate-700" id="rpt-total">0</p><p class="text-xs uppercase text-slate-500">Total Governed Assets</p></div>
-                                <div class="p-4 bg-blue-50 rounded"><p class="text-2xl font-bold text-blue-700" id="rpt-platform">0</p><p class="text-xs uppercase text-blue-500">Platform Owned</p></div>
-                                <div class="p-4 bg-gray-50 rounded"><p class="text-2xl font-bold text-gray-700" id="rpt-other">0</p><p class="text-xs uppercase text-gray-500">Other (Corp/Nops)</p></div>
+                                <div class="p-4 bg-slate-50 rounded border border-gray-100"><p class="text-2xl font-bold text-slate-700" id="rpt-total">0</p><p class="text-xs uppercase text-slate-500 mt-1">Total Governed Assets</p></div>
+                                <div class="p-4 bg-blue-50 rounded border border-blue-100"><p class="text-2xl font-bold text-blue-700" id="rpt-platform">0</p><p class="text-xs uppercase text-blue-500 mt-1">Platform Owned</p></div>
+                                <div class="p-4 bg-gray-50 rounded border border-gray-100"><p class="text-2xl font-bold text-gray-700" id="rpt-other">0</p><p class="text-xs uppercase text-gray-500 mt-1">Other (Corp/Nops)</p></div>
                             </div>
                         </div>
 
@@ -367,6 +364,73 @@
                 <div class="flex justify-center space-x-3">
                     <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
                     <button onclick="app.executeReset()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium text-sm shadow transition">Erase Everything</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Asset Modal -->
+        <div id="modal-edit-asset" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden">
+                <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900">Edit Asset Record</h3>
+                    <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                </div>
+                <div class="p-6 space-y-4 text-sm">
+                    <div>
+                        <label class="block font-medium text-gray-700 mb-1">Asset Identity</label>
+                        <div class="bg-gray-100 p-2 rounded text-gray-800 font-mono font-semibold" id="edit-asset-name"></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Owner</label>
+                            <select id="edit-asset-owner" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
+                                <option value="Platform">Platform</option>
+                                <option value="CORP">CORP</option>
+                                <option value="NOPS">NOPS</option>
+                                <option value="Unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Status</label>
+                            <select id="edit-asset-status" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
+                                <option value="Approved">Approved</option>
+                                <option value="Retired">Retired</option>
+                                <option value="Pending">Pending Review</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Environment</label>
+                            <select id="edit-asset-env" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
+                                <option value="Prod">Production</option>
+                                <option value="Non-Prod">Non-Prod / Dev</option>
+                                <option value="DR">Disaster Recovery</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Service Type</label>
+                            <input type="text" id="edit-asset-service" class="w-full border-gray-300 rounded shadow-sm py-1.5 px-3 focus:ring-blue-500 focus:border-blue-500 border">
+                        </div>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3">
+                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 font-medium transition">Cancel</button>
+                    <button onclick="app.saveAssetEdit()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium shadow transition">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Asset Confirmation Modal -->
+        <div id="modal-delete-confirm" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">Delete Asset Record</h3>
+                <p class="text-gray-600 text-sm mb-4">Are you sure you want to permanently delete <strong id="delete-confirm-name" class="text-gray-900"></strong> from the authoritative register?</p>
+                <p class="text-amber-600 text-xs mb-6 bg-amber-50 p-2 rounded border border-amber-200">Note: If this asset appears in future Qualys scans, it will be added back into the Review Queue.</p>
+                <div class="flex justify-center space-x-3">
+                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
+                    <button onclick="app.executeDeleteAsset()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium text-sm shadow transition">Delete Asset</button>
                 </div>
             </div>
         </div>
@@ -447,7 +511,6 @@
         }
 
         class QualysImportDefinition {
-            // Regex patterns to auto-map Qualys headers safely
             static FIELD_MAPPINGS = {
                 assetId: /^(asset.?id|id)$/i,
                 hostId: /^host.?id$/i,
@@ -517,10 +580,8 @@
                     item.status = decisionStatus;
                     item.resolvedDate = new Date().toISOString();
                     
-                    // Remove from active queue completely if resolved
                     queue.splice(itemIdx, 1);
 
-                    // Add to register
                     if (decisionStatus === this.STATES.APPROVED) {
                         const existingIdx = register.findIndex(r => r.normalizedName === item.normalizedName);
                         
@@ -554,9 +615,8 @@
                 let dedupeCount = 0;
                 let totalProcessed = 0;
 
-                const uniqueAssets = new Map(); // Hierarchical deduplication by identity
+                const uniqueAssets = new Map();
 
-                // 1. Deduplicate incoming payload
                 importedAssets.forEach(a => {
                     if (uniqueAssets.has(a.normalizedName)) {
                         dedupeCount++;
@@ -565,26 +625,20 @@
                     }
                 });
 
-                // 2. Reconcile against authoritative register
                 uniqueAssets.forEach(asset => {
                     totalProcessed++;
                     if (!registerKeys.has(asset.normalizedName)) {
-                        // New Asset -> Queue
                         const added = ReviewQueueService.enqueue(asset, "Newly discovered in Qualys");
                         if (added) newCount++;
                     } else {
-                        // Existing Asset -> Update last seen (In future: run drift detection here)
                         const regItem = register.find(r => r.normalizedName === asset.normalizedName);
-                        if (regItem) {
-                            regItem.lastSeen = new Date().toISOString();
-                        }
+                        if (regItem) regItem.lastSeen = new Date().toISOString();
                     }
                 });
 
-                // Save updated last seen
                 StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
 
-                return { totalProcessed, dedupeCount, newCount, missingCount: 0 }; // missing logic deferred for simplicity
+                return { totalProcessed, dedupeCount, newCount, missingCount: 0 };
             }
         }
 
@@ -600,21 +654,18 @@
                 if (!file) return;
 
                 Papa.parse(file, {
-                    header: false, // Parse as raw arrays to manually detect header offset
+                    header: false,
                     skipEmptyLines: true,
                     complete: (results) => {
                         const rawData = results.data;
                         let headerRowIndex = -1;
                         let headers = [];
 
-                        // 1. Scan first 20 rows for the real Qualys header row
                         for (let i = 0; i < Math.min(20, rawData.length); i++) {
                             const row = rawData[i];
-                            // Look for Asset Name, Hostname, or similar identifying column
                             const isHeader = row.some(cell => /^(asset.?name|hostname|dns.?hostname)$/i.test(String(cell).trim()));
                             if (isHeader) {
                                 headerRowIndex = i;
-                                // Handle duplicate column names to match PapaParse header:true default behavior safely
                                 const seen = {};
                                 headers = row.map(h => {
                                     let cleanH = String(h).trim();
@@ -635,7 +686,6 @@
                             return;
                         }
 
-                        // 2. Parse remaining rows as objects utilizing the found headers
                         this.parsedData = [];
                         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
                             const rowArray = rawData[i];
@@ -646,7 +696,6 @@
                             this.parsedData.push(rowObj);
                         }
 
-                        // 3. Detect mappings on our dynamically discovered headers
                         this.mappedHeaders = QualysImportDefinition.detectMapping(headers);
                         this.renderMappingStep(headers, headerRowIndex + 1);
                     },
@@ -681,7 +730,6 @@
                     return;
                 }
 
-                // Transform raw CSV rows to Internal Model
                 const transformed = this.parsedData.map(row => {
                     const keys = Object.keys(row);
                     const rawName = row[keys[this.mappedHeaders.assetName]];
@@ -697,10 +745,8 @@
                     };
                 }).filter(a => a.normalizedName !== 'unknown-asset' && a.normalizedName !== '');
 
-                // Pass to Reconciliation Engine
                 const results = ReconciliationEngine.run(transformed);
 
-                // Show Results
                 document.getElementById('import-step-2').classList.add('hidden');
                 document.getElementById('import-step-3').classList.remove('hidden');
                 
@@ -726,14 +772,10 @@
                     visibleIds: [],
                     pendingAction: null
                 };
-                
-                // Seed some demo register data if completely empty
-                if (StorageService.load(StorageService.KEYS.ASSET_REGISTER).length === 0) {
-                    StorageService.save(StorageService.KEYS.ASSET_REGISTER, [
-                        { normalizedName: 'mkn1piipgraf01', originalName: 'mkn1piipgraf01.piiplat.net', owner: 'Platform', service: 'Monitoring', environment: 'Prod', status: 'Approved' },
-                        { normalizedName: 'dc-01-core', originalName: 'dc-01-core.local', owner: 'CORP', service: 'Active Directory', environment: 'Prod', status: 'Approved' }
-                    ]);
-                }
+                this.registerState = {
+                    editingAsset: null,
+                    deletingAsset: null
+                };
             }
 
             init() {
@@ -855,30 +897,19 @@
 
                 let filtered = queue.filter(q => {
                     const matchState = this.reviewState.filters.state === 'ALL' || q.status === this.reviewState.filters.state;
-                    
                     const inferredOwner = ['Monitoring', 'Backup', 'Database'].includes(q.detectedService) ? 'Platform' : (q.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
                     const matchOwner = this.reviewState.filters.owner === 'ALL' || inferredOwner === this.reviewState.filters.owner;
-                    
                     const matchService = this.reviewState.filters.service === 'ALL' || q.detectedService === this.reviewState.filters.service;
-                    
                     const search = this.reviewState.filters.search.toLowerCase();
-                    const matchSearch = !search || 
-                        q.normalizedName.toLowerCase().includes(search) || 
-                        (q.originalName && q.originalName.toLowerCase().includes(search)) || 
-                        (q.ipAddress && q.ipAddress.includes(search)) ||
-                        q.detectedService.toLowerCase().includes(search);
-                        
+                    const matchSearch = !search || q.normalizedName.toLowerCase().includes(search) || (q.originalName && q.originalName.toLowerCase().includes(search)) || (q.ipAddress && q.ipAddress.includes(search)) || q.detectedService.toLowerCase().includes(search);
                     return matchState && matchOwner && matchService && matchSearch;
                 });
 
                 this.reviewState.visibleIds = filtered.map(q => q.id);
-
                 const tbody = document.getElementById('review-queue-tbody');
                 tbody.innerHTML = '';
-
                 document.getElementById('review-selected-count').textContent = this.reviewState.selectedIds.size;
-                document.getElementById('review-select-all-visible').checked = 
-                    filtered.length > 0 && filtered.every(q => this.reviewState.selectedIds.has(q.id));
+                document.getElementById('review-select-all-visible').checked = filtered.length > 0 && filtered.every(q => this.reviewState.selectedIds.has(q.id));
 
                 if (filtered.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500 italic bg-gray-50 border-b border-gray-200">No assets match the current queue filters.</td></tr>`;
@@ -889,7 +920,6 @@
                     const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(item.detectedService);
                     const suggestedOwner = isPlatformService ? 'Platform' : (item.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
                     const isChecked = this.reviewState.selectedIds.has(item.id) ? 'checked' : '';
-                    
                     const tr = document.createElement('tr');
                     tr.className = `transition ${this.reviewState.selectedIds.has(item.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50 cursor-pointer'}`;
                     
@@ -916,11 +946,9 @@
                             <span class="text-xs font-semibold ${item.status==='PENDING'?'text-blue-600 bg-blue-50 px-2 py-1 rounded': 'text-gray-600'}">${item.status}</span>
                         </td>
                         <td class="px-4 py-3 text-right space-x-2" onclick="event.stopPropagation();">
-                            <button onclick="app.approveQueueItem('${item.id}')" class="text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded text-xs font-semibold hover:bg-emerald-100 hover:text-emerald-700 transition">Approve</button>
+                            <button onclick="app.approveQueueItem('${item.id}')" class="text-blue-700 bg-blue-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-200 hover:text-blue-900 transition">Approve</button>
                         </td>
                     `;
-                    
-                    // Click row to toggle checkbox
                     tr.onclick = () => {
                          const cb = tr.querySelector('input[type="checkbox"]');
                          cb.checked = !cb.checked;
@@ -937,7 +965,6 @@
                     return;
                 }
                 this.reviewState.pendingAction = { action, owner };
-                
                 const queue = ReviewQueueService.getQueue();
                 const selectedItems = queue.filter(q => this.reviewState.selectedIds.has(q.id));
                 const services = [...new Set(selectedItems.map(q => q.detectedService))].filter(s => s).join(', ');
@@ -947,7 +974,6 @@
                 document.getElementById('bulk-confirm-owner').textContent = action === 'APPROVE' ? owner : 'N/A';
                 document.getElementById('bulk-confirm-owner-wrap').style.display = action === 'APPROVE' ? 'block' : 'none';
                 document.getElementById('bulk-confirm-services').textContent = services || 'None specified';
-
                 document.getElementById('modal-bulk-confirm').classList.remove('hidden');
             }
 
@@ -958,11 +984,7 @@
                 const processedCount = selectedItems.length;
 
                 const resolutions = selectedItems.map(item => {
-                    return {
-                        id: item.id,
-                        finalOwner: action === 'APPROVE' ? owner : 'Unknown',
-                        finalService: item.detectedService
-                    };
+                    return { id: item.id, finalOwner: action === 'APPROVE' ? owner : 'Unknown', finalService: item.detectedService };
                 });
 
                 let status = ReviewQueueService.STATES.APPROVED;
@@ -970,16 +992,13 @@
                 if (action === 'ESCALATE') status = ReviewQueueService.STATES.ESCALATED;
 
                 ReviewQueueService.resolveBulk(resolutions, status);
-
                 this.reviewState.selectedIds.clear();
                 this.reviewState.pendingAction = null;
                 
                 document.getElementById('modal-bulk-confirm').classList.add('hidden');
-                
                 this.updateGlobalBadges();
                 this.renderReviewQueue();
 
-                // Generate and Show Report
                 const remaining = ReviewQueueService.getQueue().filter(q => ['PENDING', 'IN_REVIEW'].includes(q.status)).length;
                 document.getElementById('bulk-rep-processed').textContent = processedCount;
                 document.getElementById('bulk-rep-remaining').textContent = remaining;
@@ -990,18 +1009,66 @@
                 document.getElementById('modal-bulk-confirm').classList.add('hidden');
                 document.getElementById('modal-bulk-report').classList.add('hidden');
                 document.getElementById('modal-reset-confirm').classList.add('hidden');
+                document.getElementById('modal-edit-asset').classList.add('hidden');
+                document.getElementById('modal-delete-confirm').classList.add('hidden');
+            }
+
+            editAsset(normalizedName) {
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const asset = register.find(r => r.normalizedName === normalizedName);
+                if (!asset) return;
+                
+                this.registerState.editingAsset = asset.normalizedName;
+                document.getElementById('edit-asset-name').textContent = asset.normalizedName;
+                document.getElementById('edit-asset-owner').value = asset.owner || 'Unknown';
+                document.getElementById('edit-asset-service').value = asset.service || '';
+                document.getElementById('edit-asset-env').value = asset.environment || 'Prod';
+                document.getElementById('edit-asset-status').value = asset.status || 'Approved';
+                
+                document.getElementById('modal-edit-asset').classList.remove('hidden');
+            }
+
+            saveAssetEdit() {
+                const normalizedName = this.registerState.editingAsset;
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const idx = register.findIndex(r => r.normalizedName === normalizedName);
+                
+                if (idx > -1) {
+                    register[idx].owner = document.getElementById('edit-asset-owner').value;
+                    register[idx].service = document.getElementById('edit-asset-service').value;
+                    register[idx].environment = document.getElementById('edit-asset-env').value;
+                    register[idx].status = document.getElementById('edit-asset-status').value;
+                    StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
+                    
+                    this.renderRegister();
+                    this.renderHealth();
+                    this.renderDashboard();
+                    this.closeModals();
+                }
+            }
+
+            promptDeleteAsset(normalizedName) {
+                this.registerState.deletingAsset = normalizedName;
+                document.getElementById('delete-confirm-name').textContent = normalizedName;
+                document.getElementById('modal-delete-confirm').classList.remove('hidden');
+            }
+
+            executeDeleteAsset() {
+                const normalizedName = this.registerState.deletingAsset;
+                let register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                register = register.filter(r => r.normalizedName !== normalizedName);
+                StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
+                
+                this.renderRegister();
+                this.renderHealth();
+                this.renderDashboard();
+                this.closeModals();
             }
 
             approveQueueItem(id) {
                 const owner = document.getElementById(`own-${id}`).value;
                 const queueItem = ReviewQueueService.getQueue().find(q => q.id === id);
                 ReviewQueueService.resolve(id, owner, queueItem.detectedService, ReviewQueueService.STATES.APPROVED);
-                this.updateGlobalBadges();
-                this.renderReviewQueue();
-            }
-            
-            rejectQueueItem(id) {
-                ReviewQueueService.resolve(id, 'Unknown', 'Unknown', ReviewQueueService.STATES.REJECTED);
                 this.updateGlobalBadges();
                 this.renderReviewQueue();
             }
@@ -1012,18 +1079,20 @@
                 const tbody = document.getElementById('register-tbody');
                 tbody.innerHTML = '';
 
-                const filtered = register.filter(r => 
-                    r.normalizedName.toLowerCase().includes(query) || 
-                    (r.owner && r.owner.toLowerCase().includes(query))
-                );
+                const filtered = register.filter(r => r.normalizedName.toLowerCase().includes(query) || (r.owner && r.owner.toLowerCase().includes(query)));
 
                 filtered.forEach(r => {
+                    const statusClass = r.status === 'Retired' ? 'bg-gray-200 text-gray-700' : (r.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800');
                     const tr = `<tr>
                         <td class="px-6 py-3 font-medium text-slate-800">${r.normalizedName}</td>
                         <td class="px-6 py-3"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-semibold">${r.owner || 'Unassigned'}</span></td>
                         <td class="px-6 py-3 text-slate-600 text-sm">${r.service || 'Unknown'}</td>
                         <td class="px-6 py-3 text-slate-500 text-sm">${r.environment || 'Prod'}</td>
-                        <td class="px-6 py-3"><span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded">${r.status || 'Active'}</span></td>
+                        <td class="px-6 py-3"><span class="${statusClass} text-xs px-2 py-1 rounded">${r.status || 'Active'}</span></td>
+                        <td class="px-6 py-3 text-right space-x-3">
+                            <button onclick="app.editAsset('${r.normalizedName}')" class="text-blue-700 bg-blue-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-200 hover:text-blue-900 transition">Edit</button>
+                            <button onclick="app.promptDeleteAsset('${r.normalizedName}')" class="text-red-700 bg-red-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-200 hover:text-red-900 transition">Delete</button>
+                        </td>
                     </tr>`;
                     tbody.innerHTML += tr;
                 });
@@ -1070,7 +1139,7 @@
 
             executeReset() {
                 StorageService.clearAll();
-                window.location.reload(); // Reload to re-initialize with empty state (and seed data)
+                window.location.reload();
             }
         }
 
