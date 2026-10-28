@@ -149,24 +149,83 @@
             <section id="view-review" class="view-section h-full flex flex-col">
                 <div class="flex justify-between items-end mb-4">
                     <h3 class="text-xl font-semibold">Triage Queue</h3>
-                    <div class="space-x-2">
-                        <select id="review-filter-state" class="border-gray-300 rounded text-sm px-3 py-1.5" onchange="app.renderReviewQueue()">
-                            <option value="PENDING">Pending (New)</option>
-                            <option value="IN_REVIEW">In Review</option>
-                            <option value="ESCALATED">Escalated</option>
-                        </select>
+                </div>
+                
+                <!-- Analytics Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4" id="review-analytics">
+                    <!-- Injected dynamically -->
+                </div>
+
+                <!-- Filters & Bulk Actions -->
+                <div class="bg-white p-4 rounded-lg shadow mb-4 flex flex-col space-y-3 border border-gray-200">
+                    <div class="flex flex-wrap gap-4 items-end">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Queue State</label>
+                            <select id="review-filter-state" class="border-gray-300 rounded text-sm py-1.5 pl-2 pr-8 shadow-sm" onchange="app.updateReviewFilters()">
+                                <option value="ALL">All States</option>
+                                <option value="PENDING" selected>Pending</option>
+                                <option value="IN_REVIEW">In Review</option>
+                                <option value="ESCALATED">Escalated</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Suggested Owner</label>
+                            <select id="review-filter-owner" class="border-gray-300 rounded text-sm py-1.5 pl-2 pr-8 shadow-sm" onchange="app.updateReviewFilters()">
+                                <option value="ALL">All Owners</option>
+                                <option value="Platform">Platform</option>
+                                <option value="CORP">CORP</option>
+                                <option value="Unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Service Type</label>
+                            <select id="review-filter-service" class="border-gray-300 rounded text-sm py-1.5 pl-2 pr-8 shadow-sm" onchange="app.updateReviewFilters()">
+                                <option value="ALL">All Services</option>
+                                <option value="Active Directory">Active Directory</option>
+                                <option value="Monitoring">Monitoring</option>
+                                <option value="Database">Database</option>
+                                <option value="Backup">Backup</option>
+                                <option value="DNS">DNS</option>
+                                <option value="SMTP">SMTP</option>
+                                <option value="Unclassified">Unclassified</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Search Assets</label>
+                            <input type="text" id="review-filter-search" placeholder="Search by name, IP, or service..." class="border-gray-300 rounded text-sm px-3 py-1.5 w-full shadow-sm" oninput="app.updateReviewFilters()">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                        <div class="space-x-2 text-sm flex items-center">
+                            <span class="font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded">Selected: <span id="review-selected-count" class="text-blue-600 font-bold">0</span></span>
+                            <button onclick="app.selectAllFilteredReviews()" class="text-blue-600 hover:text-blue-800 font-medium px-2 py-1 transition">Select All Filtered</button>
+                            <button onclick="app.clearReviewSelection()" class="text-gray-500 hover:text-gray-700 font-medium px-2 py-1 transition">Select None</button>
+                        </div>
+                        <div class="space-x-2 flex">
+                            <button onclick="app.promptBulkAction('APPROVE', 'Platform')" class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition">Approve Platform</button>
+                            <button onclick="app.promptBulkAction('APPROVE', 'CORP')" class="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-indigo-700 shadow-sm transition">Approve CORP</button>
+                            <button onclick="app.promptBulkAction('APPROVE', 'NOPS')" class="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 shadow-sm transition">Approve NOPS</button>
+                            <span class="border-l border-gray-300 mx-1"></span>
+                            <button onclick="app.promptBulkAction('REJECT', 'Unknown')" class="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 shadow-sm transition">Reject</button>
+                            <button onclick="app.promptBulkAction('ESCALATE', 'Unknown')" class="bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-amber-600 shadow-sm transition">Escalate</button>
+                        </div>
                     </div>
                 </div>
-                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col">
-                    <div class="overflow-x-auto">
+
+                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col border border-gray-200">
+                    <div class="overflow-y-auto flex-1">
                         <table class="min-w-full text-left text-sm whitespace-nowrap">
-                            <thead class="bg-gray-100 text-gray-600 border-b">
+                            <thead class="bg-gray-100 text-gray-600 border-b sticky top-0 z-10">
                                 <tr>
-                                    <th class="px-6 py-3">Asset Identity</th>
-                                    <th class="px-6 py-3">Suggested Owner</th>
-                                    <th class="px-6 py-3">Service Infer.</th>
-                                    <th class="px-6 py-3">Status</th>
-                                    <th class="px-6 py-3 text-right">Actions</th>
+                                    <th class="px-4 py-3 w-10 text-center">
+                                        <input type="checkbox" id="review-select-all-visible" onchange="app.toggleSelectVisibleReviews()" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 cursor-pointer">
+                                    </th>
+                                    <th class="px-4 py-3">Asset Identity</th>
+                                    <th class="px-4 py-3">Suggested Owner</th>
+                                    <th class="px-4 py-3">Service Infer.</th>
+                                    <th class="px-4 py-3">Status</th>
+                                    <th class="px-4 py-3 text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="review-queue-tbody" class="divide-y">
@@ -251,6 +310,47 @@
             </section>
 
         </div>
+
+        <!-- Bulk Action Confirmation Modal -->
+        <div id="modal-bulk-confirm" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Confirm Bulk Action</h3>
+                <div class="mb-4 text-sm text-gray-700 space-y-3">
+                    <p>You are about to classify: <strong id="bulk-confirm-count" class="text-xl text-blue-600 ml-1">0</strong> assets</p>
+                    <div class="bg-gray-50 p-3 rounded border">
+                        <p>Action: <strong id="bulk-confirm-action" class="uppercase"></strong></p>
+                        <p id="bulk-confirm-owner-wrap" class="mt-1">Target Owner: <strong id="bulk-confirm-owner"></strong></p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-800">Service Types included:</p>
+                        <p class="text-gray-600 mt-1" id="bulk-confirm-services"></p>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
+                    <button onclick="app.executeBulkAction()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium text-sm shadow transition">Proceed with Action</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Action Report Modal -->
+        <div id="modal-bulk-report" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+                <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-emerald-100 mb-4">
+                    <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Success</h3>
+                <p class="text-gray-500 text-sm mb-6">Bulk triage operation completed.</p>
+                <div class="grid grid-cols-2 gap-4 text-left border-t border-b py-4 bg-gray-50 rounded px-4">
+                    <div><p class="text-xs text-gray-500 uppercase font-semibold">Processed</p><p class="text-2xl font-bold text-gray-800" id="bulk-rep-processed">0</p></div>
+                    <div><p class="text-xs text-gray-500 uppercase font-semibold">Queue Remaining</p><p class="text-2xl font-bold text-blue-600" id="bulk-rep-remaining">0</p></div>
+                </div>
+                <div class="mt-6">
+                    <button onclick="app.closeModals()" class="w-full px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 font-medium text-sm transition shadow">Continue Triage</button>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <script>
@@ -378,39 +478,46 @@
             }
 
             static resolve(id, finalOwner, finalService, decisionStatus) {
+                this.resolveBulk([{id, finalOwner, finalService}], decisionStatus);
+            }
+
+            static resolveBulk(resolutions, decisionStatus) {
                 let queue = this.getQueue();
-                const itemIdx = queue.findIndex(q => q.id === id);
-                if (itemIdx === -1) return;
-
-                const item = queue[itemIdx];
-                item.status = decisionStatus;
-                item.resolvedDate = new Date().toISOString();
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 
-                // Remove from queue completely if resolved
-                queue.splice(itemIdx, 1);
-                StorageService.save(StorageService.KEYS.REVIEW_QUEUE, queue);
+                resolutions.forEach(({id, finalOwner, finalService}) => {
+                    const itemIdx = queue.findIndex(q => q.id === id);
+                    if (itemIdx === -1) return;
 
-                // Add to register
-                if (decisionStatus === this.STATES.APPROVED) {
-                    const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                    const existingIdx = register.findIndex(r => r.normalizedName === item.normalizedName);
+                    const item = queue[itemIdx];
+                    item.status = decisionStatus;
+                    item.resolvedDate = new Date().toISOString();
                     
-                    const newRecord = {
-                        normalizedName: item.normalizedName,
-                        originalName: item.originalName,
-                        owner: finalOwner,
-                        service: finalService,
-                        status: 'Approved',
-                        environment: 'Production', // Default
-                        decisionDate: new Date().toISOString(),
-                        lastSeen: new Date().toISOString()
-                    };
+                    // Remove from active queue completely if resolved
+                    queue.splice(itemIdx, 1);
 
-                    if (existingIdx >= 0) register[existingIdx] = { ...register[existingIdx], ...newRecord };
-                    else register.push(newRecord);
+                    // Add to register
+                    if (decisionStatus === this.STATES.APPROVED) {
+                        const existingIdx = register.findIndex(r => r.normalizedName === item.normalizedName);
+                        
+                        const newRecord = {
+                            normalizedName: item.normalizedName,
+                            originalName: item.originalName,
+                            owner: finalOwner,
+                            service: finalService,
+                            status: 'Approved',
+                            environment: 'Production',
+                            decisionDate: new Date().toISOString(),
+                            lastSeen: new Date().toISOString()
+                        };
 
-                    StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
-                }
+                        if (existingIdx >= 0) register[existingIdx] = { ...register[existingIdx], ...newRecord };
+                        else register.push(newRecord);
+                    }
+                });
+
+                StorageService.save(StorageService.KEYS.REVIEW_QUEUE, queue);
+                StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
             }
         }
 
@@ -589,6 +696,13 @@
         class App {
             constructor() {
                 this.importController = new ImportController(this);
+                this.reviewState = {
+                    filters: { state: 'PENDING', owner: 'ALL', service: 'ALL', search: '' },
+                    selectedIds: new Set(),
+                    visibleIds: [],
+                    pendingAction: null
+                };
+                
                 // Seed some demo register data if completely empty
                 if (StorageService.load(StorageService.KEYS.ASSET_REGISTER).length === 0) {
                     StorageService.save(StorageService.KEYS.ASSET_REGISTER, [
@@ -654,45 +768,203 @@
                 if (queue.length === 0 && missingOwner === 0) actionsList.innerHTML = '<li class="text-gray-500 italic">No pending actions. You\'re all caught up.</li>';
             }
 
+            renderReviewQueueAnalytics(queue) {
+                const active = queue.filter(q => q.status === 'PENDING' || q.status === 'IN_REVIEW');
+                const counts = { Platform: 0, CORP: 0, Unknown: 0, Monitoring: 0, Database: 0, 'Active Directory': 0 };
+                
+                active.forEach(q => {
+                    const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(q.detectedService);
+                    const owner = isPlatformService ? 'Platform' : (q.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
+                    if (counts[owner] !== undefined) counts[owner]++;
+                    if (counts[q.detectedService] !== undefined) counts[q.detectedService]++;
+                });
+
+                const container = document.getElementById('review-analytics');
+                if(!container) return;
+                
+                container.innerHTML = `
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-blue-600 font-bold tracking-wider mb-1">Platform Cands.</p><p class="text-2xl font-black text-blue-800">${counts.Platform}</p></div>
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-indigo-600 font-bold tracking-wider mb-1">CORP Cands.</p><p class="text-2xl font-black text-indigo-800">${counts.CORP}</p></div>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">Unknown</p><p class="text-2xl font-black text-gray-700">${counts.Unknown}</p></div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">Monitoring</p><p class="text-2xl font-bold text-gray-800">${counts.Monitoring}</p></div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">Database</p><p class="text-2xl font-bold text-gray-800">${counts.Database}</p></div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">AD / Domain</p><p class="text-2xl font-bold text-gray-800">${counts['Active Directory']}</p></div>
+                `;
+            }
+
+            updateReviewFilters() {
+                this.reviewState.filters.state = document.getElementById('review-filter-state').value;
+                this.reviewState.filters.owner = document.getElementById('review-filter-owner').value;
+                this.reviewState.filters.service = document.getElementById('review-filter-service').value;
+                this.reviewState.filters.search = document.getElementById('review-filter-search').value;
+                this.renderReviewQueue();
+            }
+
+            toggleReviewSelection(id, isSelected) {
+                if (isSelected) this.reviewState.selectedIds.add(id);
+                else this.reviewState.selectedIds.delete(id);
+                document.getElementById('review-selected-count').textContent = this.reviewState.selectedIds.size;
+            }
+
+            toggleSelectVisibleReviews() {
+                const selectAll = document.getElementById('review-select-all-visible').checked;
+                this.reviewState.visibleIds.forEach(id => {
+                    if (selectAll) this.reviewState.selectedIds.add(id);
+                    else this.reviewState.selectedIds.delete(id);
+                });
+                this.renderReviewQueue();
+            }
+
+            selectAllFilteredReviews() {
+                this.reviewState.visibleIds.forEach(id => this.reviewState.selectedIds.add(id));
+                this.renderReviewQueue();
+            }
+
+            clearReviewSelection() {
+                this.reviewState.selectedIds.clear();
+                this.renderReviewQueue();
+            }
+
             renderReviewQueue() {
-                const stateFilter = document.getElementById('review-filter-state').value;
-                const queue = ReviewQueueService.getQueue().filter(q => q.status === stateFilter);
+                const queue = ReviewQueueService.getQueue();
+                this.renderReviewQueueAnalytics(queue);
+
+                let filtered = queue.filter(q => {
+                    const matchState = this.reviewState.filters.state === 'ALL' || q.status === this.reviewState.filters.state;
+                    
+                    const inferredOwner = ['Monitoring', 'Backup', 'Database'].includes(q.detectedService) ? 'Platform' : (q.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
+                    const matchOwner = this.reviewState.filters.owner === 'ALL' || inferredOwner === this.reviewState.filters.owner;
+                    
+                    const matchService = this.reviewState.filters.service === 'ALL' || q.detectedService === this.reviewState.filters.service;
+                    
+                    const search = this.reviewState.filters.search.toLowerCase();
+                    const matchSearch = !search || 
+                        q.normalizedName.toLowerCase().includes(search) || 
+                        (q.originalName && q.originalName.toLowerCase().includes(search)) || 
+                        (q.ipAddress && q.ipAddress.includes(search)) ||
+                        q.detectedService.toLowerCase().includes(search);
+                        
+                    return matchState && matchOwner && matchService && matchSearch;
+                });
+
+                this.reviewState.visibleIds = filtered.map(q => q.id);
+
                 const tbody = document.getElementById('review-queue-tbody');
                 tbody.innerHTML = '';
 
-                if (queue.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 italic">No assets currently in ${stateFilter} state.</td></tr>`;
+                document.getElementById('review-selected-count').textContent = this.reviewState.selectedIds.size;
+                document.getElementById('review-select-all-visible').checked = 
+                    filtered.length > 0 && filtered.every(q => this.reviewState.selectedIds.has(q.id));
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500 italic bg-gray-50 border-b border-gray-200">No assets match the current queue filters.</td></tr>`;
                     return;
                 }
 
-                queue.forEach(item => {
-                    // Pre-select Platform if inferred service strongly matches
+                filtered.forEach(item => {
                     const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(item.detectedService);
+                    const suggestedOwner = isPlatformService ? 'Platform' : (item.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
+                    const isChecked = this.reviewState.selectedIds.has(item.id) ? 'checked' : '';
                     
                     const tr = document.createElement('tr');
+                    tr.className = `transition ${this.reviewState.selectedIds.has(item.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50 cursor-pointer'}`;
+                    
                     tr.innerHTML = `
-                        <td class="px-6 py-4">
-                            <div class="font-medium text-gray-900">${item.normalizedName}</div>
-                            <div class="text-xs text-gray-500 font-mono">${item.ipAddress || 'No IP'}</div>
+                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation();">
+                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="app.toggleReviewSelection('${item.id}', this.checked); this.closest('tr').classList.toggle('bg-blue-50/60', this.checked);" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 cursor-pointer">
                         </td>
-                        <td class="px-6 py-4">
-                            <select id="own-${item.id}" class="border-gray-300 rounded text-sm px-2 py-1">
-                                <option value="Platform" ${isPlatformService ? 'selected' : ''}>Platform</option>
-                                <option value="CORP" ${!isPlatformService && item.detectedService === 'Active Directory' ? 'selected' : ''}>CORP</option>
-                                <option value="NOPS">NOPS</option>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-900">${item.normalizedName}</div>
+                            <div class="text-xs text-gray-500 font-mono">${item.ipAddress || 'No IP Data'}</div>
+                        </td>
+                        <td class="px-4 py-3" onclick="event.stopPropagation();">
+                            <select id="own-${item.id}" class="border-gray-300 rounded text-sm px-2 py-1 shadow-sm bg-white focus:ring-blue-500 focus:border-blue-500">
+                                <option value="Platform" ${suggestedOwner === 'Platform' ? 'selected' : ''}>Platform</option>
+                                <option value="CORP" ${suggestedOwner === 'CORP' ? 'selected' : ''}>CORP</option>
+                                <option value="NOPS" ${suggestedOwner === 'NOPS' ? 'selected' : ''}>NOPS</option>
+                                <option value="Unknown" ${suggestedOwner === 'Unknown' ? 'selected' : ''}>Unknown</option>
                             </select>
                         </td>
-                        <td class="px-6 py-4">
-                            <span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">${item.detectedService}</span>
+                        <td class="px-4 py-3">
+                            <span class="bg-slate-100 text-slate-700 text-xs px-2.5 py-1 rounded-md font-medium border border-slate-200">${item.detectedService}</span>
                         </td>
-                        <td class="px-6 py-4 text-xs font-semibold ${item.status==='PENDING'?'text-blue-600':''}">${item.status}</td>
-                        <td class="px-6 py-4 text-right space-x-2">
-                            <button onclick="app.approveQueueItem('${item.id}')" class="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-emerald-700">Approve</button>
-                            <button onclick="app.rejectQueueItem('${item.id}')" class="bg-red-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-700">Reject</button>
+                        <td class="px-4 py-3">
+                            <span class="text-xs font-semibold ${item.status==='PENDING'?'text-blue-600 bg-blue-50 px-2 py-1 rounded': 'text-gray-600'}">${item.status}</span>
+                        </td>
+                        <td class="px-4 py-3 text-right space-x-2" onclick="event.stopPropagation();">
+                            <button onclick="app.approveQueueItem('${item.id}')" class="text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded text-xs font-semibold hover:bg-emerald-100 hover:text-emerald-700 transition">Approve</button>
                         </td>
                     `;
+                    
+                    // Click row to toggle checkbox
+                    tr.onclick = () => {
+                         const cb = tr.querySelector('input[type="checkbox"]');
+                         cb.checked = !cb.checked;
+                         this.toggleReviewSelection(item.id, cb.checked);
+                         tr.classList.toggle('bg-blue-50/60', cb.checked);
+                    };
                     tbody.appendChild(tr);
                 });
+            }
+
+            promptBulkAction(action, owner) {
+                if (this.reviewState.selectedIds.size === 0) {
+                    alert("Please select at least one asset to perform a bulk action.");
+                    return;
+                }
+                this.reviewState.pendingAction = { action, owner };
+                
+                const queue = ReviewQueueService.getQueue();
+                const selectedItems = queue.filter(q => this.reviewState.selectedIds.has(q.id));
+                const services = [...new Set(selectedItems.map(q => q.detectedService))].filter(s => s).join(', ');
+
+                document.getElementById('bulk-confirm-count').textContent = this.reviewState.selectedIds.size;
+                document.getElementById('bulk-confirm-action').textContent = action;
+                document.getElementById('bulk-confirm-owner').textContent = action === 'APPROVE' ? owner : 'N/A';
+                document.getElementById('bulk-confirm-owner-wrap').style.display = action === 'APPROVE' ? 'block' : 'none';
+                document.getElementById('bulk-confirm-services').textContent = services || 'None specified';
+
+                document.getElementById('modal-bulk-confirm').classList.remove('hidden');
+            }
+
+            executeBulkAction() {
+                const { action, owner } = this.reviewState.pendingAction;
+                const queue = ReviewQueueService.getQueue();
+                const selectedItems = queue.filter(q => this.reviewState.selectedIds.has(q.id));
+                const processedCount = selectedItems.length;
+
+                const resolutions = selectedItems.map(item => {
+                    return {
+                        id: item.id,
+                        finalOwner: action === 'APPROVE' ? owner : 'Unknown',
+                        finalService: item.detectedService
+                    };
+                });
+
+                let status = ReviewQueueService.STATES.APPROVED;
+                if (action === 'REJECT') status = ReviewQueueService.STATES.REJECTED;
+                if (action === 'ESCALATE') status = ReviewQueueService.STATES.ESCALATED;
+
+                ReviewQueueService.resolveBulk(resolutions, status);
+
+                this.reviewState.selectedIds.clear();
+                this.reviewState.pendingAction = null;
+                
+                document.getElementById('modal-bulk-confirm').classList.add('hidden');
+                
+                this.updateGlobalBadges();
+                this.renderReviewQueue();
+
+                // Generate and Show Report
+                const remaining = ReviewQueueService.getQueue().filter(q => ['PENDING', 'IN_REVIEW'].includes(q.status)).length;
+                document.getElementById('bulk-rep-processed').textContent = processedCount;
+                document.getElementById('bulk-rep-remaining').textContent = remaining;
+                document.getElementById('modal-bulk-report').classList.remove('hidden');
+            }
+
+            closeModals() {
+                document.getElementById('modal-bulk-confirm').classList.add('hidden');
+                document.getElementById('modal-bulk-report').classList.add('hidden');
             }
 
             approveQueueItem(id) {
