@@ -566,16 +566,29 @@
                     <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-800 text-2xl font-bold leading-none">&times;</button>
                 </div>
                 <div class="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3 mb-4">
-                    Chrome's built-in AI runs on this device: nothing is sent anywhere. A hosted provider receives vulnerability titles, CVEs, vendor solutions and asset roles; use a local model (an OpenAI-compatible server such as Ollama) if that data must stay in-house. Keys stay in this browser and are not part of the backup.
+                    Chrome's built-in AI runs on this device: nothing is sent anywhere. If you add an API key, that provider receives vulnerability titles, CVEs, vendor solutions and asset roles; use a local model (an OpenAI-compatible server such as Ollama) if that data must stay in-house. Keys stay in this browser and are not part of the backup.
                 </div>
                 <div class="space-y-3 text-sm">
-                    <label class="flex items-start gap-2 rounded border bg-slate-50 p-3"><input id="ai-prefer-chrome" type="checkbox" class="mt-1 rounded border-gray-300"><span><strong>Use Chrome's built-in AI when available</strong> (on-device, free, private; falls back to the provider below)<span id="ai-chrome-status" class="block text-xs text-gray-500 mt-1"></span></span></label>
-                    <div><label class="block font-medium mb-1">Hosted / local provider</label>
-                        <select id="ai-provider" onchange="app.aiProviderChanged()" class="w-full border rounded p-2"><option value="anthropic">Anthropic Claude</option><option value="gemini">Google Gemini</option><option value="openai">OpenAI-compatible (e.g. Ollama)</option></select></div>
-                    <div id="ai-baseurl-row" class="hidden"><label class="block font-medium mb-1">Base URL</label>
-                        <input id="ai-baseurl" class="w-full border rounded p-2" placeholder="http://localhost:11434/v1"></div>
-                    <div><label class="block font-medium mb-1">Model</label><input id="ai-model" class="w-full border rounded p-2" placeholder=""></div>
-                    <div><label id="ai-key-label" class="block font-medium mb-1">API key</label><input id="ai-key" type="password" autocomplete="off" class="w-full border rounded p-2"></div>
+                    <div class="rounded border bg-slate-50 p-3 space-y-2">
+                        <label class="flex items-start gap-2"><input id="ai-prefer-chrome" type="checkbox" class="mt-1 rounded border-gray-300"><span><strong>Use Chrome's built-in AI first</strong> <span class="text-gray-500">(default: on-device, free, private; no key needed)</span></span></label>
+                        <p id="ai-chrome-status" class="text-xs text-gray-600">Checking…</p>
+                        <div id="ai-chrome-progress" class="hidden"><div class="h-2 bg-gray-200 rounded overflow-hidden"><div id="ai-chrome-bar" class="h-2 bg-blue-600 transition-all" style="width:0%"></div></div><p id="ai-chrome-progress-text" class="text-xs text-gray-600 mt-1"></p></div>
+                        <div class="flex gap-2">
+                            <button id="ai-chrome-dl" onclick="app.downloadChromeModel()" class="hidden px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">⬇ Download Chrome AI model</button>
+                            <button onclick="app.refreshChromeStatus()" class="px-3 py-1.5 border rounded text-xs hover:bg-white">Re-check</button>
+                        </div>
+                    </div>
+                    <details id="ai-keys" class="rounded border p-3">
+                        <summary class="cursor-pointer font-medium">API key or local model <span class="font-normal text-gray-500">(optional; used if Chrome's AI is unavailable)</span></summary>
+                        <div class="space-y-3 mt-3">
+                            <div><label class="block font-medium mb-1">Provider</label>
+                                <select id="ai-provider" onchange="app.aiProviderChanged()" class="w-full border rounded p-2"><option value="anthropic">Anthropic Claude</option><option value="gemini">Google Gemini</option><option value="openai">OpenAI-compatible (e.g. Ollama)</option></select></div>
+                            <div id="ai-baseurl-row" class="hidden"><label class="block font-medium mb-1">Base URL</label>
+                                <input id="ai-baseurl" class="w-full border rounded p-2" placeholder="http://localhost:11434/v1"></div>
+                            <div><label class="block font-medium mb-1">Model</label><input id="ai-model" class="w-full border rounded p-2" placeholder=""></div>
+                            <div><label id="ai-key-label" class="block font-medium mb-1">API key</label><input id="ai-key" type="password" autocomplete="off" class="w-full border rounded p-2"></div>
+                        </div>
+                    </details>
                     <label class="flex items-start gap-2"><input id="ai-web" type="checkbox" class="mt-1 rounded border-gray-300"><span>Use public sources: look up NVD, CISA KEV, EPSS, Red Hat and OSV for the CVEs involved (only CVE ids are sent), and let Claude or Gemini search the web</span></label>
                     <label class="flex items-start gap-2"><input id="ai-anon" type="checkbox" class="mt-1 rounded border-gray-300"><span>Replace hostnames with neutral aliases before sending to a hosted provider (IP addresses are never sent)</span></label>
                 </div>
@@ -1005,13 +1018,23 @@
 
             static chromeStatusText(st) {
                 return ({
-                    available: 'Ready: the on-device model is installed.',
-                    downloadable: 'Supported: the model downloads the first time you generate a plan.',
-                    downloading: 'The on-device model is still downloading.',
-                    unavailable: 'This Chrome or device cannot run the built-in model (check chrome://on-device-internals).',
-                    unsupported: 'This Chrome does not offer the Prompt API.',
-                    insecure: 'Not available on file:// pages. Open the portal from https:// (GitHub Pages) or http://localhost.'
+                    available: '✅ Ready: the on-device model is installed.',
+                    downloadable: 'Supported. The model (a few GB) has not been downloaded yet: click Download.',
+                    downloading: 'The on-device model is downloading. Keep this tab open, or click Resume to watch it.',
+                    unavailable: "Chrome says this device cannot use the built-in model right now. Check chrome://flags/#optimization-guide-on-device-model and #prompt-api-for-gemini-nano are Enabled, that you have about 22 GB free disk, then look at chrome://on-device-internals. If this is a managed laptop, IT policy (GenAILocalFoundationalModelSettings) may be blocking it.",
+                    unsupported: 'This Chrome does not offer the Prompt API. Update Chrome (138 or later).',
+                    insecure: 'Chrome only offers the built-in model on https:// or http://localhost pages, not file://. Open the portal from its https address, or run it from localhost.'
                 })[st] || st;
+            }
+
+            // Triggers (and reports) the one-off model download. Must run straight from a click: Chrome needs a user gesture.
+            static async downloadChromeModel(onProgress) {
+                if (typeof LanguageModel === 'undefined') throw new Error("Chrome's Prompt API is not available on this page.");
+                const session = await LanguageModel.create({
+                    ...this.CHROME_OPTS,
+                    monitor(m) { m.addEventListener('downloadprogress', (e) => onProgress && onProgress(e.loaded, `Downloading Chrome's on-device model… ${Math.round(e.loaded * 100)}%`)); }
+                });
+                try { session.destroy(); } catch (e) { /* ignore */ }
             }
 
             // Prefer Chrome's on-device model when asked and usable; otherwise the configured provider.
@@ -2274,7 +2297,7 @@
                 const aiKey = 'report:' + scope + ':' + riskStatusFilter;
                 const out = $('rpt-ai-out');
                 out.dataset.key = aiKey;
-                out.innerHTML = this.aiCache.get(aiKey) || '<p class="text-gray-500 italic print-hide">Generate a 30-day plan from the fixes and assets above. Works with the provider set under AI Settings.</p>';
+                out.innerHTML = this.aiCache.get(aiKey) || '<p class="text-gray-500 italic print-hide">Generate a 30-day plan from the fixes and assets above. Uses Chrome&#39;s built-in AI by default (the first use downloads the model); an API key is optional.</p>';
             }
 
 
@@ -2460,7 +2483,7 @@
                                     <button onclick="app.runAI('asset', app.inspectCtx.name, true)" title="Ask again" class="bg-white text-blue-700 border border-blue-300 px-2 py-1 text-xs rounded hover:bg-blue-100">↻</button>
                                 </span>
                             </h4>
-                            <div id="ai-out" class="text-sm text-gray-800"><p class="text-gray-600 italic">Click Generate for an AI plan covering fix order, per-OS steps, change risk and how to verify closure.</p></div>
+                            <div id="ai-out" class="text-sm text-gray-800"><p class="text-gray-600 italic">Click Generate for an AI plan covering fix order, per-OS steps, change risk and how to verify closure. Uses Chrome&#39;s built-in AI by default; the first use downloads the model.</p></div>
                         </div>
                     </div>
 
@@ -2580,7 +2603,7 @@
                                     <button onclick="app.runAI('qid', app.inspectCtx.qid, true)" title="Ask again" class="bg-white text-blue-700 border border-blue-300 px-2 py-1 text-xs rounded hover:bg-blue-100">↻</button>
                                 </span>
                             </h4>
-                            <div id="ai-out" data-key="qid:${esc(qid)}" class="text-sm text-gray-800">${this.aiCache.get('qid:' + qid) || '<p class="text-gray-600 italic">Click Generate for a rollout plan across the affected assets: order, change risk, steps per OS and how to verify.</p>'}</div>
+                            <div id="ai-out" data-key="qid:${esc(qid)}" class="text-sm text-gray-800">${this.aiCache.get('qid:' + qid) || '<p class="text-gray-600 italic">Click Generate for a rollout plan across the affected assets. Uses Chrome&#39;s built-in AI by default; the first use downloads the model.</p>'}</div>
                         </div>
                     </div>
 
@@ -2740,7 +2763,7 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 const eng = await AIService.resolve();
                 if (!eng) {
                     const st = await AIService.chromeStatus();
-                    out.innerHTML = `<div class="rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">No AI engine is available. Chrome's built-in model: ${esc(AIService.chromeStatusText(st))} Or set up a hosted/local provider. <button onclick="app.openAISettings()" class="underline font-semibold">Open AI Settings</button></div>`;
+                    out.innerHTML = `<div class="rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">No AI engine is available yet. ${esc(AIService.chromeStatusText(st))} You can also add an API key or local model. <button onclick="app.openAISettings()" class="underline font-semibold">Open AI Settings</button></div>`;
                     if (kind !== 'report') {
                         out.insertAdjacentHTML('beforeend', '<p class="text-xs text-gray-500 italic mt-3">Showing public fix data instead (no AI needed)…</p>');
                         const intel = await this.intelHTML(kind, id).catch(() => '');
@@ -2758,6 +2781,11 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                     let used = eng, res, prep;
                     if (eng.kind === 'chrome') {
                         try {
+                            if (eng.status !== 'available') {
+                                status("Downloading Chrome's on-device model (first use only, a few GB)…");
+                                await AIService.downloadChromeModel((f, t) => status(t));
+                            }
+                            status(s.webResearch ? 'Looking up public vulnerability intelligence…' : 'Preparing…');
                             prep = await this.prepareAI(kind, id, true);
                             res = await AIService.completeChrome(App.AI_SYSTEM, prep.make, status);
                         } catch (e) {
@@ -2788,6 +2816,34 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 if (el && el.dataset.key === key) el.innerHTML = html;
             }
 
+            async refreshChromeStatus() {
+                const $ = (id) => document.getElementById(id);
+                $('ai-chrome-status').textContent = 'Checking…';
+                const st = await AIService.chromeStatus();
+                $('ai-chrome-status').textContent = AIService.chromeStatusText(st);
+                $('ai-chrome-status').className = 'text-xs ' + (st === 'available' ? 'text-green-700 font-semibold' : (st === 'downloadable' || st === 'downloading') ? 'text-blue-800' : 'text-amber-800');
+                const btn = $('ai-chrome-dl');
+                btn.classList.toggle('hidden', !(st === 'downloadable' || st === 'downloading'));
+                btn.textContent = st === 'downloading' ? '⏳ Resume / wait for download' : '⬇ Download Chrome AI model';
+                return st;
+            }
+
+            async downloadChromeModel() {
+                const $ = (id) => document.getElementById(id);
+                const btn = $('ai-chrome-dl');
+                btn.disabled = true;
+                $('ai-chrome-progress').classList.remove('hidden');
+                $('ai-chrome-bar').style.width = '0%';
+                $('ai-chrome-progress-text').textContent = 'Starting…';
+                try {
+                    await AIService.downloadChromeModel((frac, text) => { $('ai-chrome-bar').style.width = Math.round(frac * 100) + '%'; $('ai-chrome-progress-text').textContent = text; });
+                    $('ai-chrome-bar').style.width = '100%';
+                    $('ai-chrome-progress-text').textContent = 'Model ready.';
+                } catch (e) {
+                    $('ai-chrome-progress-text').textContent = `Download failed: ${e.message}. Details: chrome://on-device-internals`;
+                } finally { btn.disabled = false; await this.refreshChromeStatus(); }
+            }
+
             async openAISettings() {
                 const s = AIService.load();
                 const $ = (id) => document.getElementById(id);
@@ -2799,10 +2855,11 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 $('ai-prefer-chrome').checked = s.preferChrome;
                 $('ai-web').checked = s.webResearch;
                 $('ai-test-result').textContent = '';
-                $('ai-chrome-status').textContent = 'Checking…';
+                $('ai-chrome-progress').classList.add('hidden');
+                $('ai-keys').open = !!(s.apiKey || s.baseUrl);
                 this.aiProviderChanged();
                 $('modal-ai-settings').classList.remove('hidden');
-                AIService.chromeStatus().then(st => { $('ai-chrome-status').textContent = AIService.chromeStatusText(st); });
+                this.refreshChromeStatus();
             }
 
             aiProviderChanged() {
