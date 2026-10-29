@@ -530,13 +530,73 @@
             </div>
         </div>
 
+        <!-- NEW ASSET RISK DETAIL VIEW -->
+        <div id="modal-asset-detail" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden p-6 flex flex-col max-h-[95vh]">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-800" id="det-name">Asset Name</h3>
+                        <p class="text-sm text-gray-500" id="det-env">Environment • Service • Exposure</p>
+                    </div>
+                    <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-800 text-2xl font-bold">&times;</button>
+                </div>
+                
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                    <div class="bg-gray-50 p-3 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Owner</p><p class="font-bold text-gray-800" id="det-owner"></p></div>
+                    <div class="bg-gray-50 p-3 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Risk Status</p><p class="font-bold text-gray-800" id="det-status"></p></div>
+                    <div class="bg-blue-50 border border-blue-200 p-3 rounded"><p class="text-[10px] text-blue-600 uppercase font-semibold">Actionable Risk</p><p class="font-bold text-blue-800 text-lg" id="det-actionable"></p></div>
+                    <div class="bg-amber-50 border border-amber-200 p-3 rounded"><p class="text-[10px] text-amber-600 uppercase font-semibold">Accepted Risk</p><p class="font-bold text-amber-800 text-lg" id="det-accepted"></p></div>
+                </div>
+
+                <div class="flex-1 overflow-hidden flex flex-col border rounded mb-4 min-h-[250px]">
+                    <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
+                        <span class="font-semibold text-sm text-gray-700">Correlated Vulnerabilities</span>
+                    </div>
+                    <div class="overflow-y-auto flex-1">
+                        <table class="min-w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-gray-50 text-gray-600 border-b sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-center">Sev</th>
+                                    <th class="px-3 py-2">QID</th>
+                                    <th class="px-3 py-2">CVE</th>
+                                    <th class="px-3 py-2 w-full">Title</th>
+                                    <th class="px-3 py-2 text-center">Patchable</th>
+                                    <th class="px-3 py-2">Age</th>
+                                    <th class="px-3 py-2 text-right">TruRisk</th>
+                                </tr>
+                            </thead>
+                            <tbody id="det-vulns-tbody" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 border-t pt-4 shrink-0">
+                    <div class="col-span-2 bg-blue-50 border border-blue-200 rounded p-4 relative">
+                        <h4 class="font-semibold text-blue-900 text-sm mb-3 flex justify-between items-center">
+                            Remediation Advice 
+                            <button onclick="app.generateRemediationAdvice()" class="bg-blue-600 text-white px-3 py-1 text-xs rounded hover:bg-blue-700 shadow-sm font-medium transition">Generate Advice</button>
+                        </h4>
+                        <div id="det-advice-content" class="text-sm text-blue-800 space-y-2 italic">Click generate to analyze findings and calculate estimated risk reduction.</div>
+                    </div>
+                    <div class="flex flex-col space-y-2 justify-center">
+                        <button onclick="app.openRiskModal([document.getElementById('det-name').textContent])" class="w-full bg-amber-100 text-amber-800 border border-amber-300 py-3 rounded text-sm font-bold hover:bg-amber-200 shadow-sm transition">⚖️ Accept Risk</button>
+                        <button onclick="app.closeModals()" class="w-full bg-gray-100 text-gray-800 border py-3 rounded text-sm font-bold hover:bg-gray-200 shadow-sm transition">Close View</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="modal-risk-accept" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
             <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden p-6 space-y-4 text-sm">
                 <h3 class="text-lg font-bold" id="ra-modal-title">Record Risk Acceptance</h3>
                 <form id="ra-form" onsubmit="event.preventDefault(); app.saveRiskAcceptance();" class="grid grid-cols-2 gap-4">
                     <input type="hidden" id="ra-id">
                     <div class="col-span-2">
-                        <label class="block font-medium mb-1">Selected Assets</label>
+                        <label class="block font-medium mb-1">Target Assets</label>
+                        <select id="ra-apply-scope" class="w-full border rounded p-2 bg-gray-50 font-bold text-blue-900 mb-2">
+                            <option value="SELECTED" id="ra-opt-selected">Selected Assets (0)</option>
+                            <option value="FILTERED" id="ra-opt-filtered">All Filtered Assets (0)</option>
+                        </select>
                         <div id="ra-asset-list" class="w-full border rounded p-2 bg-gray-50 max-h-24 overflow-y-auto font-mono text-xs text-gray-700"></div>
                     </div>
                     <div class="col-span-2"><label class="block font-medium mb-1">Reason for Acceptance</label><textarea id="ra-reason" required class="w-full border rounded p-2" placeholder="e.g., Legacy application dependency..."></textarea></div>
@@ -569,6 +629,7 @@
                 VULN_ASSET_SUMMARY: 'gov_vuln_asset_summary',
                 VULN_SERVICE_SUMMARY: 'gov_vuln_service_summary',
                 VULN_CVE_SUMMARY: 'gov_vuln_cve_summary',
+                VULN_DETAILS: 'gov_vuln_details',
                 RISK_ACCEPTANCES: 'gov_risk_acceptances'
             };
 
@@ -590,9 +651,10 @@
                     vulnAssetSummary: this.load(this.KEYS.VULN_ASSET_SUMMARY),
                     vulnServiceSummary: this.load(this.KEYS.VULN_SERVICE_SUMMARY),
                     vulnCveSummary: this.load(this.KEYS.VULN_CVE_SUMMARY),
+                    vulnDetails: this.load(this.KEYS.VULN_DETAILS),
                     riskAcceptances: this.load(this.KEYS.RISK_ACCEPTANCES),
                     exportDate: new Date().toISOString(),
-                    version: '2.5'
+                    version: '2.6'
                 };
                 const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -961,7 +1023,7 @@
                 this.reviewState = { filters: { state: 'PENDING', owner: 'ALL', service: 'ALL', search: '' }, selectedIds: new Set(), visibleIds: [], pendingAction: null };
                 this.registerState = { editingAsset: null, deletingAsset: null, selectedAssets: new Set() };
                 this.vulnState = { filters: { patchable: 'ALL', severity: 'ALL', owner: 'ALL', exposure: 'ALL', riskStatus: 'Open' }, selectedAssets: new Set() };
-                this.raState = { selectedAssets: [] };
+                this.raState = { selectedAssets: [], filteredAssets: [], currentDetailAsset: null };
             }
 
             init() {
@@ -1198,16 +1260,9 @@
             }
 
             renderRegister() {
-                const query = document.getElementById('register-search').value.toLowerCase();
-                const riskFilter = document.getElementById('register-filter-risk').value;
+                const filtered = this.getRegisterFilteredAssets();
                 const tbody = document.getElementById('register-tbody');
                 tbody.innerHTML = '';
-                
-                const filtered = StorageService.load(StorageService.KEYS.ASSET_REGISTER).filter(r => {
-                    const statusMatch = riskFilter === 'ALL' || (r.riskStatus || 'Open') === riskFilter;
-                    const searchMatch = r.normalizedName.includes(query);
-                    return statusMatch && searchMatch;
-                });
 
                 filtered.forEach(r => {
                     const isSelected = this.registerState.selectedAssets.has(r.normalizedName);
@@ -1215,19 +1270,29 @@
                     let rsBadge = rs === 'Open' ? 'bg-red-100 text-red-800' : (rs === 'Risk Accepted' ? 'bg-amber-100 text-amber-800' : (rs === 'Resolved' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'));
                     
                     tbody.innerHTML += `
-                        <tr class="${isSelected ? 'bg-blue-50/60' : 'hover:bg-gray-50'}">
-                            <td class="px-6 py-2 text-center"><input type="checkbox" value="${r.normalizedName}" ${isSelected ? 'checked' : ''} onchange="app.toggleRegisterAsset(this.value, this.checked)" class="rounded border-gray-300"></td>
+                        <tr class="cursor-pointer ${isSelected ? 'bg-blue-50/60' : 'hover:bg-gray-50'}" onclick="app.openAssetDetail('${r.normalizedName}')">
+                            <td class="px-6 py-2 text-center" onclick="event.stopPropagation()"><input type="checkbox" value="${r.normalizedName}" ${isSelected ? 'checked' : ''} onchange="app.toggleRegisterAsset(this.value, this.checked)" class="rounded border-gray-300"></td>
                             <td class="px-6 py-2 font-medium text-gray-800">${r.normalizedName}</td>
                             <td class="px-6 py-2">${r.owner}</td>
                             <td class="px-6 py-2">${r.service}</td>
                             <td class="px-6 py-2">${r.environment}</td>
                             <td class="px-6 py-2"><span class="${rsBadge} text-[10px] uppercase font-bold px-2 py-0.5 rounded shadow-sm">${rs}</span></td>
-                            <td class="px-6 py-2 text-right">
-                                <button onclick="app.openRiskModal(['${r.normalizedName}'])" class="text-amber-600 px-2 text-xs font-semibold hover:underline">Accept Risk</button>
+                            <td class="px-6 py-2 text-right" onclick="event.stopPropagation()">
+                                <button onclick="app.openRiskModal(['${r.normalizedName}'], 'register')" class="text-amber-600 px-2 text-xs font-semibold hover:underline">Accept Risk</button>
                                 <button onclick="app.editAsset('${r.normalizedName}')" class="text-blue-600 px-2 text-xs hover:underline">Edit</button>
                                 <button onclick="app.promptDeleteAsset('${r.normalizedName}')" class="text-red-600 px-2 text-xs hover:underline">Del</button>
                             </td>
                         </tr>`;
+                });
+            }
+
+            getRegisterFilteredAssets() {
+                const query = document.getElementById('register-search').value.toLowerCase();
+                const riskFilter = document.getElementById('register-filter-risk').value;
+                return StorageService.load(StorageService.KEYS.ASSET_REGISTER).filter(r => {
+                    const statusMatch = riskFilter === 'ALL' || (r.riskStatus || 'Open') === riskFilter;
+                    const searchMatch = r.normalizedName.includes(query);
+                    return statusMatch && searchMatch;
                 });
             }
 
@@ -1238,10 +1303,7 @@
             }
 
             toggleAllRegister(isChecked) {
-                const query = document.getElementById('register-search').value.toLowerCase();
-                const riskFilter = document.getElementById('register-filter-risk').value;
-                const filtered = StorageService.load(StorageService.KEYS.ASSET_REGISTER).filter(r => (riskFilter === 'ALL' || (r.riskStatus || 'Open') === riskFilter) && r.normalizedName.includes(query));
-                
+                const filtered = this.getRegisterFilteredAssets();
                 filtered.forEach(r => isChecked ? this.registerState.selectedAssets.add(r.normalizedName) : this.registerState.selectedAssets.delete(r.normalizedName));
                 this.renderRegister();
             }
@@ -1291,6 +1353,7 @@
                 const assetSummary = {};
                 const serviceSummary = {};
                 const cveSummary = {};
+                const vulnDetails = {};
 
                 let headerFound = false;
                 let headerRow = [];
@@ -1360,6 +1423,19 @@
                         const multiplier = RiskScoringEngine.getMultiplier(a.exposure);
                         const weightedRisk = truRisk * multiplier;
 
+                        // Detailed Findings Bucket
+                        if (!vulnDetails[a.normalizedName]) vulnDetails[a.normalizedName] = [];
+                        const ageStr = (safeGet(['First Detected', 'Age']) || 'N/A').split('T')[0];
+                        vulnDetails[a.normalizedName].push([
+                            safeGet(['QID']) || '',
+                            cve,
+                            severity,
+                            title.substring(0, 100), // Trim for space
+                            patchable ? 1 : 0,
+                            ageStr,
+                            truRisk
+                        ]);
+
                         // Asset Summary Bucket
                         if (!assetSummary[a.normalizedName]) {
                             assetSummary[a.normalizedName] = {
@@ -1412,9 +1488,18 @@
                         document.getElementById('vuln-prog-skipped').textContent = uniqueAssetsSkipped.size;
                         document.getElementById('vuln-prog-agg').textContent = findingsAggregated;
 
+                        // OPTIMIZATION: Prevent QuotaExceededError in localStorage
+                        // Cap the stored detailed findings to the top 50 highest risk per asset.
+                        Object.keys(vulnDetails).forEach(assetName => {
+                            vulnDetails[assetName] = vulnDetails[assetName]
+                                .sort((a, b) => b[6] - a[6]) // Sort by TruRisk descending
+                                .slice(0, 50); // Keep only the top 50 actionable findings
+                        });
+
                         StorageService.save(StorageService.KEYS.VULN_ASSET_SUMMARY, Object.values(assetSummary));
                         StorageService.save(StorageService.KEYS.VULN_SERVICE_SUMMARY, Object.values(serviceSummary));
                         StorageService.save(StorageService.KEYS.VULN_CVE_SUMMARY, Object.values(cveSummary));
+                        StorageService.save(StorageService.KEYS.VULN_DETAILS, vulnDetails);
                         
                         this.renderVulnDashboard();
                         
@@ -1426,23 +1511,10 @@
             }
 
             renderVulnDashboard() {
-                const assetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
                 const cveSummary = StorageService.load(StorageService.KEYS.VULN_CVE_SUMMARY) || [];
+                const filteredAssets = this.getVulnFilteredAssets();
 
-                const { patchable, severity, owner, exposure, riskStatus } = this.vulnState.filters;
-
-                let filteredAssets = assetSummary.filter(a => {
-                    if (owner !== 'ALL' && a.owner !== owner) return false;
-                    if (exposure !== 'ALL' && a.exposure !== exposure) return false;
-                    if (riskStatus !== 'ALL' && (a.riskStatus || 'Open') !== riskStatus) return false;
-                    
-                    if (patchable === 'YES' && a.riskPatchable === 0) return false;
-                    if (severity === '4+' && a.riskSev4Plus === 0) return false;
-                    if (severity === '5' && a.riskSev5 === 0) return false;
-                    
-                    return true;
-                });
-
+                const { patchable, severity } = this.vulnState.filters;
                 const getRisk = (a) => {
                     if (severity === '5') return a.riskSev5;
                     if (severity === '4+') return a.riskSev4Plus;
@@ -1503,18 +1575,18 @@
                 const topAssets = getTop(riskMap);
                 document.getElementById('vuln-top-assets').innerHTML = topAssets.length ? topAssets.map(t => {
                     const isChecked = this.vulnState.selectedAssets.has(t.name);
-                    return `<tr class="${isChecked ? 'bg-blue-50/60' : 'even:bg-gray-50 hover:bg-blue-50 transition'}">
-                        <td class="px-3 py-2 text-center"><input type="checkbox" value="${t.name}" ${isChecked ? 'checked' : ''} onchange="app.toggleVulnAsset(this.value, this.checked)" class="rounded border-gray-300"></td>
+                    return `<tr class="cursor-pointer ${isChecked ? 'bg-blue-50/60' : 'even:bg-gray-50 hover:bg-blue-50 transition'}" onclick="app.openAssetDetail('${t.name}')">
+                        <td class="px-3 py-2 text-center" onclick="event.stopPropagation()"><input type="checkbox" value="${t.name}" ${isChecked ? 'checked' : ''} onchange="app.toggleVulnAsset(this.value, this.checked)" class="rounded border-gray-300"></td>
                         <td class="px-2 py-2 font-medium text-gray-700">${t.name}</td>
                         <td class="px-2 py-2 text-gray-600">${t.owner}</td>
                         <td class="px-2 py-2 text-center">${badge(t.risk)}</td>
                         <td class="px-2 py-2 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td>
-                        <td class="px-2 py-2 text-right"><button onclick="app.openRiskModal(['${t.name}'])" class="text-amber-600 font-semibold hover:underline text-[10px] uppercase">Accept</button></td>
+                        <td class="px-2 py-2 text-right" onclick="event.stopPropagation()"><button onclick="app.openRiskModal(['${t.name}'], 'vuln')" class="text-amber-600 font-semibold hover:underline text-[10px] uppercase">Accept</button></td>
                     </tr>`;
                 }).join('') : empty(6, "No assets currently meet filter criteria.");
 
                 const topPatchable = getTop(patchableRiskMap);
-                document.getElementById('vuln-top-patchable').innerHTML = topPatchable.length ? topPatchable.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.name}</td><td class="px-4 py-3 text-gray-600">${t.owner}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
+                document.getElementById('vuln-top-patchable').innerHTML = topPatchable.length ? topPatchable.map(t => `<tr class="cursor-pointer even:bg-gray-50 hover:bg-blue-50 transition" onclick="app.openAssetDetail('${t.name}')"><td class="px-4 py-3 font-medium text-gray-700">${t.name}</td><td class="px-4 py-3 text-gray-600">${t.owner}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
 
                 const topTeams = getTop(teams);
                 document.getElementById('vuln-top-teams').innerHTML = topTeams.length ? topTeams.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.owner}</td><td class="px-4 py-3 text-gray-600">${formatNum(t.count)} Assets</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
@@ -1533,10 +1605,15 @@
             }
 
             toggleAllVuln(isChecked) {
+                const filtered = this.getVulnFilteredAssets().sort((x, y) => y.riskTotal - x.riskTotal).slice(0, 10); // Checkbox is only on top 10 visible
+                filtered.forEach(a => isChecked ? this.vulnState.selectedAssets.add(a.name) : this.vulnState.selectedAssets.delete(a.name));
+                this.renderVulnDashboard();
+            }
+
+            getVulnFilteredAssets() {
                 const assetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
                 const { patchable, severity, owner, exposure, riskStatus } = this.vulnState.filters;
-                
-                const filtered = assetSummary.filter(a => {
+                return assetSummary.filter(a => {
                     if (owner !== 'ALL' && a.owner !== owner) return false;
                     if (exposure !== 'ALL' && a.exposure !== exposure) return false;
                     if (riskStatus !== 'ALL' && (a.riskStatus || 'Open') !== riskStatus) return false;
@@ -1544,10 +1621,7 @@
                     if (severity === '4+' && a.riskSev4Plus === 0) return false;
                     if (severity === '5' && a.riskSev5 === 0) return false;
                     return a.riskTotal > 0;
-                }).sort((x, y) => y.riskTotal - x.riskTotal).slice(0, 10); // Checkbox is only on top 10
-
-                filtered.forEach(a => isChecked ? this.vulnState.selectedAssets.add(a.name) : this.vulnState.selectedAssets.delete(a.name));
-                this.renderVulnDashboard();
+                });
             }
 
             renderReports() {
@@ -1700,7 +1774,7 @@
                     const as = vulnSum.find(v => v.name === a.asset);
                     const trueRisk = as ? as.riskTotal : 0;
 
-                    return `<tr class="hover:bg-gray-50">
+                    return `<tr class="cursor-pointer hover:bg-gray-50" onclick="app.openAssetDetail('${a.asset}')">
                         <td class="px-6 py-3">
                             <div class="font-medium text-gray-800">${a.asset}</div>
                             <div class="text-[10px] text-gray-500 uppercase">${a.service}</div>
@@ -1709,29 +1783,120 @@
                         <td class="px-6 py-3"><span class="bg-gray-100 text-xs px-2 py-1 rounded">${a.status}</span></td>
                         <td class="px-6 py-3 text-right font-mono font-semibold">${formatNum(trueRisk)}</td>
                         <td class="px-6 py-3 text-center ${expStyle}">${a.expDate}</td>
-                        <td class="px-6 py-3 text-right">
+                        <td class="px-6 py-3 text-right" onclick="event.stopPropagation()">
                             <button onclick="app.deleteRiskAcceptance('${a.id}', '${a.asset}')" class="text-red-600 px-2 text-sm hover:underline">Revoke</button>
                         </td>
                     </tr>`;
                 }).join('');
             }
 
-            openBulkRiskModal(source) {
-                let assetsToProcess = [];
-                if (source === 'register') assetsToProcess = Array.from(this.registerState.selectedAssets);
-                else if (source === 'vuln') assetsToProcess = Array.from(this.vulnState.selectedAssets);
+            openAssetDetail(assetName) {
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER).find(r => r.normalizedName === assetName);
+                if (!reg) return;
                 
-                if (assetsToProcess.length === 0) return alert("Please select at least one asset to apply risk governance.");
-                this.openRiskModal(assetsToProcess);
+                const vulnSum = (StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).find(v => v.name === assetName);
+                const vulns = (StorageService.load(StorageService.KEYS.VULN_DETAILS) || {})[assetName] || [];
+
+                this.raState.currentDetailAsset = assetName;
+
+                document.getElementById('det-name').textContent = assetName;
+                document.getElementById('det-env').textContent = `${reg.environment || 'Prod'} • ${reg.service || 'Unclassified'} • ${reg.exposure || 'Unknown Exposure'}`;
+                document.getElementById('det-owner').textContent = reg.owner || 'Unknown';
+                document.getElementById('det-status').textContent = reg.riskStatus || 'Open';
+
+                const formatNum = (n) => Math.round(n).toLocaleString();
+                let actionable = 0, accepted = 0;
+                if (vulnSum) {
+                    if ((reg.riskStatus || 'Open') === 'Risk Accepted') accepted = vulnSum.riskTotal;
+                    else actionable = vulnSum.riskTotal;
+                }
+                document.getElementById('det-actionable').textContent = formatNum(actionable);
+                document.getElementById('det-accepted').textContent = formatNum(accepted);
+
+                const tbody = document.getElementById('det-vulns-tbody');
+                if (vulns.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-6 text-center text-gray-500 italic">No vulnerability findings discovered for this asset.</td></tr>';
+                } else {
+                    const badge = (s) => s === 5 ? `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] font-bold">5</span>` : (s === 4 ? `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold">4</span>` : `<span class="bg-gray-100 text-gray-800 px-2 py-0.5 rounded text-[10px] font-bold">${s}</span>`);
+                    tbody.innerHTML = vulns.sort((a,b) => b[6] - a[6]).map(v => `
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-3 py-2 text-center">${badge(v[2])}</td>
+                            <td class="px-3 py-2 text-xs font-mono text-gray-500">${v[0]}</td>
+                            <td class="px-3 py-2 text-xs font-mono text-blue-600 font-semibold">${v[1] || '-'}</td>
+                            <td class="px-3 py-2 text-xs text-gray-800 truncate max-w-sm" title="${v[3]}">${v[3]}</td>
+                            <td class="px-3 py-2 text-center text-xs">${v[4] ? '✅' : '-'}</td>
+                            <td class="px-3 py-2 text-xs text-gray-500">${v[5]}</td>
+                            <td class="px-3 py-2 text-right text-xs font-mono font-bold">${v[6]}</td>
+                        </tr>
+                    `).join('');
+                }
+                
+                document.getElementById('det-advice-content').innerHTML = 'Click generate to analyze findings and calculate estimated risk reduction.';
+                document.getElementById('modal-asset-detail').classList.remove('hidden');
             }
 
-            openRiskModal(assetNames = []) {
-                this.raState.selectedAssets = assetNames;
+            generateRemediationAdvice() {
+                const assetName = this.raState.currentDetailAsset;
+                const vulns = (StorageService.load(StorageService.KEYS.VULN_DETAILS) || {})[assetName] || [];
+                const out = document.getElementById('det-advice-content');
+                
+                if (vulns.length === 0) {
+                    out.innerHTML = '<span class="text-gray-500">No vulnerabilities found to generate advice.</span>';
+                    return;
+                }
+
+                const patchable = vulns.filter(v => v[4] === 1);
+                const crit = vulns.filter(v => v[2] === 5);
+                const riskRed = patchable.reduce((sum, v) => sum + v[6], 0);
+
+                let advice = `<ul class="list-disc pl-4 space-y-3 mt-2">`;
+                if (patchable.length > 0) {
+                    advice += `<li><strong>Priority 1 Patching Sprint:</strong> Deploy updates addressing ${patchable.length} vulnerabilities. This action will eliminate <strong>${Math.round(riskRed).toLocaleString()}</strong> points of preventable risk.</li>`;
+                }
+                if (crit.length > 0) {
+                    advice += `<li><strong>Critical Action:</strong> Investigate and address the highest severity finding immediately: <em>${crit[0][3]}</em> ${crit[0][1] ? `(CVE: ${crit[0][1]})` : ''}.</li>`;
+                }
+                if (patchable.length === 0 && crit.length === 0) {
+                    advice += `<li><strong>General Maintenance:</strong> Consider compensating controls, network isolation, or operating system upgrades for unpatchable findings.</li>`;
+                }
+                advice += `</ul>`;
+                out.innerHTML = advice;
+            }
+
+            openBulkRiskModal(source) {
+                let selected = [];
+                let filtered = [];
+                
+                if (source === 'register') {
+                    selected = Array.from(this.registerState.selectedAssets);
+                    filtered = this.getRegisterFilteredAssets().map(r => r.normalizedName);
+                } else if (source === 'vuln') {
+                    selected = Array.from(this.vulnState.selectedAssets);
+                    filtered = this.getVulnFilteredAssets().map(a => a.name);
+                }
+                
+                if (selected.length === 0 && filtered.length === 0) return alert("No assets available to apply risk governance.");
+                this.openRiskModal(selected, source, filtered);
+            }
+
+            openRiskModal(selectedAssets = [], source = null, filteredAssets = []) {
+                this.raState.selectedAssets = selectedAssets;
+                this.raState.filteredAssets = filteredAssets.length > 0 ? filteredAssets : selectedAssets; // fallback if directly opened
+
                 const form = document.getElementById('ra-form');
                 form.reset();
                 
-                document.getElementById('ra-modal-title').textContent = assetNames.length > 1 ? `Bulk Risk Acceptance (${assetNames.length} Assets)` : `Record Risk Acceptance`;
-                document.getElementById('ra-asset-list').innerHTML = assetNames.map(n => `<div>• ${n}</div>`).join('');
+                document.getElementById('ra-modal-title').textContent = `Risk Governance Action`;
+                
+                document.getElementById('ra-opt-selected').textContent = `Selected Assets (${this.raState.selectedAssets.length})`;
+                document.getElementById('ra-opt-filtered').textContent = `All Filtered Assets (${this.raState.filteredAssets.length})`;
+                
+                // Default to filtered if no selection, otherwise default to selected
+                document.getElementById('ra-apply-scope').value = this.raState.selectedAssets.length > 0 ? 'SELECTED' : 'FILTERED';
+                
+                document.getElementById('ra-asset-list').innerHTML = this.raState.selectedAssets.length > 0 
+                    ? this.raState.selectedAssets.map(n => `<div>• ${n}</div>`).join('') 
+                    : `<div class="text-gray-500 italic">Scope is set to all ${this.raState.filteredAssets.length} filtered assets.</div>`;
                 
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('ra-acc-date').value = today;
@@ -1740,6 +1905,8 @@
                 nextYear.setFullYear(nextYear.getFullYear() + 1);
                 document.getElementById('ra-exp-date').value = nextYear.toISOString().split('T')[0];
                 
+                // Hide any previous modals so it sits cleanly on top
+                document.getElementById('modal-asset-detail').classList.add('hidden');
                 document.getElementById('modal-risk-accept').classList.remove('hidden');
             }
 
@@ -1748,6 +1915,14 @@
                 const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER) || [];
                 const vulnSum = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
                 
+                const scope = document.getElementById('ra-apply-scope').value;
+                const targetAssets = scope === 'FILTERED' ? this.raState.filteredAssets : this.raState.selectedAssets;
+                
+                if (targetAssets.length === 0) {
+                    alert("No assets selected in the specified scope.");
+                    return;
+                }
+
                 const newStatus = document.getElementById('ra-status').value;
                 const reason = document.getElementById('ra-reason').value;
                 const control = document.getElementById('ra-control').value;
@@ -1756,7 +1931,7 @@
                 const revDate = document.getElementById('ra-rev-date').value;
                 const expDate = document.getElementById('ra-exp-date').value;
 
-                this.raState.selectedAssets.forEach(assetName => {
+                targetAssets.forEach(assetName => {
                     // Update Asset Register
                     const rIdx = reg.findIndex(r => r.normalizedName === assetName);
                     if (rIdx > -1) reg[rIdx].riskStatus = newStatus;
