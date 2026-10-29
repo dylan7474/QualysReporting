@@ -137,7 +137,10 @@
 
             <!-- VIEW: REVIEW QUEUE -->
             <section id="view-review" class="view-section h-full flex flex-col">
-                <div class="flex flex-wrap gap-4 mb-4" id="review-analytics"></div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex flex-wrap gap-4" id="review-analytics"></div>
+                    <button onclick="app.rebuildQueue()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm font-medium shadow-sm transition mt-1">🔄 Rebuild Queue</button>
+                </div>
                 
                 <div class="bg-white p-4 rounded-lg shadow mb-4 border flex flex-wrap gap-4 items-end">
                     <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">State</label><select id="review-filter-state" onchange="app.updateReviewFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All States</option><option value="PENDING" selected>Pending</option><option value="IN_REVIEW">In Review</option><option value="ESCALATED">Escalated</option></select></div>
@@ -431,6 +434,29 @@
             }
         }
 
+        class OwnershipRuleEngine {
+            static evaluate(name) {
+                const n = String(name).toLowerCase();
+                
+                // CORP Rules
+                if (/^corp-(l|d|w|s|v)-/.test(n) || n.startsWith('corp-') || n.includes('.corp.') || n.includes('corp.local')) {
+                    return { owner: 'CORP', source: 'Ownership Rule' };
+                }
+                
+                // Platform Rules
+                if (n.includes('piip') || n.includes('peip') || n.includes('smtp') || n.includes('zbx') || n.includes('graf') || n.includes('zdb') || n.includes('veeam') || n.includes('backv') || n.includes('.piiplat.net') || n.includes('.peiplat.net')) {
+                    return { owner: 'Platform', source: 'Ownership Rule' };
+                }
+                
+                // NOPS Rules
+                if (n.includes('nops') || n.includes('noc') || n.includes('network')) {
+                    return { owner: 'NOPS', source: 'Ownership Rule' };
+                }
+                
+                return null;
+            }
+        }
+
         class QualysImportDefinition {
             static FIELD_MAPPINGS = {
                 assetId: /^(asset.?id|id)$/i,
@@ -576,8 +602,16 @@
                         if (platformKeys.has(asset.normalizedName) || (asset.assetId && platformKeys.has(asset.assetId))) {
                             suggestedOwner = 'Platform'; ownershipSource = 'Platform Inventory';
                         } else {
-                            if (['Monitoring', 'Backup', 'Database'].includes(asset.inferredService)) { suggestedOwner = 'Platform'; ownershipSource = 'Naming Convention'; }
-                            else if (asset.inferredService === 'Active Directory') { suggestedOwner = 'CORP'; ownershipSource = 'Naming Convention'; }
+                            const ruleMatch = OwnershipRuleEngine.evaluate(asset.normalizedName);
+                            if (ruleMatch) {
+                                suggestedOwner = ruleMatch.owner;
+                                ownershipSource = ruleMatch.source;
+                            } else if (['Monitoring', 'Backup', 'Database'].includes(asset.inferredService)) { 
+                                suggestedOwner = 'Platform'; ownershipSource = 'Service Inference'; 
+                            }
+                            else if (asset.inferredService === 'Active Directory') { 
+                                suggestedOwner = 'CORP'; ownershipSource = 'Service Inference'; 
+                            }
                         }
                         asset.suggestedOwner = suggestedOwner;
                         asset.ownershipSource = ownershipSource;
@@ -745,16 +779,36 @@
                 document.getElementById('kpi-health-score').textContent = missing === 0 ? '100%' : Math.round(((register.length - missing) / register.length) * 100) + '%';
             }
 
+            rebuildQueue() {
+                const queue = ReviewQueueService.getQueue();
+                // Extract all pending items to run them back through reconciliation rules
+                const pendingAssets = queue.filter(q => q.status !== 'APPROVED' && q.status !== 'REJECTED').map(q => q.qualysData);
+                const resolved = queue.filter(q => q.status === 'APPROVED' || q.status === 'REJECTED');
+                
+                // Clear active queue, keeping history intact
+                StorageService.save(StorageService.KEYS.REVIEW_QUEUE, resolved);
+                
+                // Re-evaluate pending items with the updated Rule Engine
+                ReconciliationEngine.run(pendingAssets);
+                this.renderReviewQueue();
+                this.updateGlobalBadges();
+            }
+
             renderReviewQueueAnalytics(queue) {
                 const active = queue.filter(q => q.status === 'PENDING' || q.status === 'IN_REVIEW');
-                const counts = { Platform: 0, CORP: 0, Unknown: 0, Monitoring: 0, Database: 0, 'Active Directory': 0 };
-                active.forEach(q => { counts[q.suggestedOwner || 'Unknown'] = (counts[q.suggestedOwner || 'Unknown']||0) + 1; counts[q.detectedService] = (counts[q.detectedService]||0) + 1; });
+                const sources = { 'Platform Inventory': 0, 'Ownership Rule': 0, 'Service Inference': 0, 'Unknown': 0 };
+                
+                active.forEach(q => { 
+                    const src = q.ownershipSource || 'Unknown';
+                    if (sources[src] !== undefined) sources[src]++;
+                    else sources['Unknown']++;
+                });
+                
                 document.getElementById('review-analytics').innerHTML = `
-                    <div class="bg-blue-50 border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Platform</p><p class="text-xl font-bold">${counts.Platform}</p></div>
-                    <div class="bg-indigo-50 border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">CORP</p><p class="text-xl font-bold">${counts.CORP}</p></div>
-                    <div class="bg-gray-50 border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Unknown</p><p class="text-xl font-bold">${counts.Unknown}</p></div>
-                    <div class="bg-white border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Monitoring</p><p class="text-xl font-bold">${counts.Monitoring}</p></div>
-                    <div class="bg-white border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Database</p><p class="text-xl font-bold">${counts.Database}</p></div>
+                    <div class="bg-blue-50 border border-blue-200 p-3 rounded shadow-sm"><p class="text-[10px] uppercase font-semibold text-blue-700">Platform Inv Matches</p><p class="text-xl font-bold">${sources['Platform Inventory']}</p></div>
+                    <div class="bg-indigo-50 border border-indigo-200 p-3 rounded shadow-sm"><p class="text-[10px] uppercase font-semibold text-indigo-700">Rule Matches</p><p class="text-xl font-bold">${sources['Ownership Rule']}</p></div>
+                    <div class="bg-emerald-50 border border-emerald-200 p-3 rounded shadow-sm"><p class="text-[10px] uppercase font-semibold text-emerald-700">Service Inference</p><p class="text-xl font-bold">${sources['Service Inference']}</p></div>
+                    <div class="bg-gray-50 border border-gray-200 p-3 rounded shadow-sm"><p class="text-[10px] uppercase font-semibold text-gray-700">Unknown</p><p class="text-xl font-bold">${sources['Unknown']}</p></div>
                 `;
             }
 
