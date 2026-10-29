@@ -9,6 +9,18 @@
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         .view-section:not(.active) { display: none !important; }
+        
+        @media print {
+            body, main, #view-container, .view-section.active { 
+                display: block !important; 
+                height: auto !important; 
+                overflow: visible !important; 
+                background: white !important; 
+            }
+            aside, header, button.nav-btn, .print-hide { display: none !important; }
+            #printable-report { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; }
+            .print-break { page-break-before: always; }
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex h-screen overflow-hidden text-gray-800">
@@ -29,9 +41,9 @@
             <button onclick="app.switchView('register')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🗄️ Asset Register</button>
             <button onclick="app.switchView('vuln')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🛡️ Vuln Management</button>
             <button onclick="app.switchView('health')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🩺 Data Health</button>
-            <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Governance Report</button>
+            <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Executive Report</button>
         </nav>
-        <div class="p-4 border-t border-slate-700">
+        <div class="p-4 border-t border-slate-700 print-hide">
             <button onclick="app.exportDatabase()" class="w-full bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded transition mb-2">💾 Backup DB (JSON)</button>
             <button onclick="app.promptReset()" class="w-full bg-red-900/40 hover:bg-red-800/60 text-red-200 text-sm py-2 rounded transition border border-red-800/50">⚠️ Reset Database</button>
         </div>
@@ -40,7 +52,7 @@
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50">
         <!-- Header -->
-        <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-0">
+        <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-0 print-hide">
             <h2 id="page-title" class="text-2xl font-semibold text-gray-800">Dashboard</h2>
             <div class="flex items-center space-x-4">
                 <span class="text-sm text-gray-500" id="last-sync-label">Local Browser Instance</span>
@@ -225,24 +237,90 @@
                  </div>
             </section>
 
-            <!-- VIEW: REPORTS -->
+            <!-- VIEW: EXECUTIVE RISK REPORT -->
             <section id="view-reports" class="view-section">
-                <div class="bg-white rounded-lg shadow p-8 max-w-4xl mx-auto border">
+                <div class="bg-white rounded-lg shadow p-8 max-w-5xl mx-auto border" id="printable-report">
                     <div class="flex justify-between items-center mb-8 border-b pb-4">
                         <div>
-                            <h2 class="text-2xl font-bold">Executive Governance Report</h2>
-                            <p class="text-gray-500 text-sm mt-1" id="report-date"></p>
+                            <h2 class="text-3xl font-bold text-slate-800">Executive Risk Report</h2>
+                            <p class="text-gray-500 text-sm mt-1" id="report-date-main"></p>
                         </div>
-                        <button onclick="window.print()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded text-sm font-medium">🖨️ Print PDF</button>
+                        <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded shadow-sm text-sm font-medium print-hide">🖨️ Print PDF</button>
                     </div>
-                    <div class="grid grid-cols-3 gap-4 text-center mb-8">
-                        <div class="p-4 bg-slate-50 rounded border"><p class="text-2xl font-bold text-slate-700" id="rpt-total">0</p><p class="text-xs uppercase text-slate-500">Total Assets</p></div>
-                        <div class="p-4 bg-blue-50 rounded border border-blue-100"><p class="text-2xl font-bold text-blue-700" id="rpt-platform">0</p><p class="text-xs uppercase text-blue-500">Platform Owned</p></div>
-                        <div class="p-4 bg-gray-50 rounded border"><p class="text-2xl font-bold text-gray-700" id="rpt-other">0</p><p class="text-xs uppercase text-gray-500">Other</p></div>
+
+                    <!-- 1. Executive Summary -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-bold text-slate-800 border-b pb-2 mb-4">1. Executive Summary</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="rpt-exec-summary">
+                            <!-- Populated by JS -->
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">Ownership Sources (Platform)</h3>
-                        <ul class="list-disc pl-5 space-y-2 text-sm text-gray-700" id="rpt-ownership-sources"></ul>
+
+                    <!-- 2 & 3: Teams & Services side-by-side -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">2. Team Risk Summary</h3>
+                            <table class="min-w-full text-sm text-left">
+                                <thead class="text-gray-500 bg-gray-50 border-b">
+                                    <tr><th class="py-2 px-2 font-semibold">Team</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Combined Risk</th></tr>
+                                </thead>
+                                <tbody id="rpt-team-risk" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">3. Top Risk Services</h3>
+                            <table class="min-w-full text-sm text-left">
+                                <thead class="text-gray-500 bg-gray-50 border-b">
+                                    <tr><th class="py-2 px-2 font-semibold">Service</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Weighted Risk</th></tr>
+                                </thead>
+                                <tbody id="rpt-svc-risk" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 4 & 5: Assets & Patching -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">4. Highest Risk Assets</h3>
+                            <table class="min-w-full text-sm text-left">
+                                <thead class="text-gray-500 bg-gray-50 border-b">
+                                    <tr><th class="py-2 px-2 font-semibold">Asset</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Weighted Risk</th></tr>
+                                </thead>
+                                <tbody id="rpt-top-assets" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">5. Patching Priority Queue</h3>
+                            <table class="min-w-full text-sm text-left">
+                                <thead class="text-gray-500 bg-gray-50 border-b">
+                                    <tr><th class="py-2 px-2 font-semibold">Asset</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Patchable Risk</th></tr>
+                                </thead>
+                                <tbody id="rpt-patch-priority" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 6: Highest Impact Vulnerabilities -->
+                    <div class="mb-8 print-break">
+                        <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">6. Highest Impact Vulnerabilities</h3>
+                        <table class="min-w-full text-sm text-left">
+                            <thead class="text-gray-500 bg-gray-50 border-b">
+                                <tr><th class="py-2 px-2 font-semibold">CVE</th><th class="py-2 px-2 font-semibold w-full">Description</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Impact</th></tr>
+                            </thead>
+                            <tbody id="rpt-top-cves" class="divide-y"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- 7 & 8: Gov Health & Actions -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 bg-gray-50 p-6 rounded-lg border">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">7. Governance Health</h3>
+                            <div id="rpt-gov-health" class="space-y-4"></div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">8. Recommended Actions This Month</h3>
+                            <ul id="rpt-actions" class="list-disc pl-5 space-y-2 text-sm text-gray-700"></ul>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -843,7 +921,7 @@
             init() {
                 this.updateGlobalBadges();
                 this.switchView('dashboard');
-                document.getElementById('report-date').textContent = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', day: 'numeric' });
+                document.getElementById('report-date-main').textContent = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', day: 'numeric' });
             }
 
             switchView(viewId) {
@@ -1045,13 +1123,6 @@
                 const ls = document.getElementById('health-missing-service'); ls.innerHTML = '';
                 reg.filter(r => !r.owner || r.owner === 'Unknown').forEach(r => lo.innerHTML += `<li>${r.normalizedName}</li>`);
                 reg.filter(r => !r.service || r.service === 'Unclassified').forEach(r => ls.innerHTML += `<li>${r.normalizedName}</li>`);
-            }
-
-            renderReports() {
-                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                document.getElementById('rpt-total').textContent = reg.length;
-                document.getElementById('rpt-platform').textContent = reg.filter(r => r.owner === 'Platform').length;
-                document.getElementById('rpt-other').textContent = reg.filter(r => r.owner !== 'Platform').length;
             }
 
             exportDatabase() { StorageService.exportDatabase(); }
@@ -1283,10 +1354,10 @@
                 const getTop = (arr) => arr.sort((x, y) => y.risk - x.risk).slice(0, 10);
                 const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
                 const badge = (r) => {
-                    if (r > 1000000) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Critical</span>`;
-                    if (r >= 250000) return `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">High</span>`;
-                    if (r >= 50000) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Medium</span>`;
-                    return `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Low</span>`;
+                    if (r > 1000000) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Critical</span>`;
+                    if (r >= 250000) return `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">High</span>`;
+                    if (r >= 50000) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Medium</span>`;
+                    return `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Low</span>`;
                 };
                 const empty = (c, m) => `<tr><td colspan="${c}" class="px-4 py-8 text-center text-gray-500 italic">${m}</td></tr>`;
 
@@ -1311,6 +1382,93 @@
 
                 const topCves = getTop(cves);
                 document.getElementById('vuln-top-cves').innerHTML = topCves.length ? topCves.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-mono text-xs text-blue-700 font-semibold">${t.cve}</td><td class="px-4 py-3 text-sm truncate max-w-sm text-gray-700" title="${t.title}">${t.title || 'N/A'}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No correlated vulnerabilities available.");
+            }
+
+            renderReports() {
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const assetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
+                const cveSummary = StorageService.load(StorageService.KEYS.VULN_CVE_SUMMARY) || [];
+
+                document.getElementById('report-date-main').textContent = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', day: 'numeric' });
+
+                const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+                const badge = (r) => {
+                    if (r > 1000000) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Critical</span>`;
+                    if (r >= 250000) return `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">High</span>`;
+                    if (r >= 50000) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Medium</span>`;
+                    return `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Low</span>`;
+                };
+                const empty = (c, m) => `<tr><td colspan="${c}" class="px-2 py-4 text-center text-gray-500 italic">${m}</td></tr>`;
+
+                // 1. Executive Summary Calc
+                let totalFindings = 0, totalRisk = 0, totalPatchableRisk = 0, totalCritical = 0;
+                const teamMap = {}, svcMap = {};
+                
+                assetSummary.forEach(a => {
+                    totalFindings += a.findingsTotal;
+                    totalPatchableRisk += a.riskPatchable;
+                    totalCritical += a.findingsCritical;
+                    totalRisk += a.riskTotal;
+
+                    if (a.riskTotal > 0) {
+                        if (!teamMap[a.owner]) teamMap[a.owner] = { owner: a.owner, risk: 0 };
+                        teamMap[a.owner].risk += a.riskTotal;
+
+                        if (!svcMap[a.service]) svcMap[a.service] = { service: a.service, risk: 0 };
+                        svcMap[a.service].risk += a.riskTotal;
+                    }
+                });
+
+                document.getElementById('rpt-exec-summary').innerHTML = `
+                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Assets</p><p class="text-xl font-bold text-gray-900">${formatNum(reg.length)}</p></div>
+                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Vulnerabilities</p><p class="text-xl font-bold text-gray-900">${formatNum(totalFindings)}</p></div>
+                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Operational Risk</p><p class="text-xl font-bold text-gray-900">${formatNum(totalRisk)}</p></div>
+                    <div class="p-4 bg-blue-50 rounded border border-blue-200"><p class="text-[10px] text-blue-700 uppercase font-semibold">Patchable Risk</p><p class="text-xl font-bold text-blue-900">${formatNum(totalPatchableRisk)}</p></div>
+                `;
+
+                const getTop = (arr, limit = 5) => arr.sort((x, y) => y.risk - x.risk).slice(0, limit);
+
+                // 2. Teams
+                const topTeams = getTop(Object.values(teamMap));
+                document.getElementById('rpt-team-risk').innerHTML = topTeams.length ? topTeams.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700">${t.owner}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No team risk data.");
+
+                // 3. Services
+                const topSvcs = getTop(Object.values(svcMap));
+                document.getElementById('rpt-svc-risk').innerHTML = topSvcs.length ? topSvcs.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700">${t.service}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No service risk data.");
+
+                // 4. Top Assets
+                const topAssets = getTop(assetSummary.map(a => ({ name: a.name, risk: a.riskTotal })).filter(a => a.risk > 0));
+                document.getElementById('rpt-top-assets').innerHTML = topAssets.length ? topAssets.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700 truncate max-w-[200px]">${t.name}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No asset risk data.");
+
+                // 5. Patch Priority
+                const topPatch = getTop(assetSummary.map(a => ({ name: a.name, risk: a.riskPatchable })).filter(a => a.risk > 0));
+                document.getElementById('rpt-patch-priority').innerHTML = topPatch.length ? topPatch.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700 truncate max-w-[200px]">${t.name}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No patchable risk data.");
+
+                // 6. Top CVEs
+                const topCves = getTop(cveSummary, 5);
+                document.getElementById('rpt-top-cves').innerHTML = topCves.length ? topCves.map(t => `<tr><td class="px-2 py-2 font-mono text-xs text-blue-700 font-semibold w-32">${t.cve}</td><td class="px-2 py-2 text-gray-700 truncate max-w-[300px]" title="${t.title}">${t.title || 'N/A'}</td><td class="px-2 py-2 text-center w-24">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold w-32">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No CVE data available.");
+
+                // 7. Governance Health
+                const missingOwnerCount = reg.filter(r => !r.owner || r.owner === 'Unknown').length;
+                const unclassifiedCount = reg.filter(r => !r.service || r.service === 'Unclassified').length;
+                const healthScore = reg.length === 0 ? 100 : Math.round(((reg.length - missingOwnerCount) / reg.length) * 100);
+                
+                document.getElementById('rpt-gov-health').innerHTML = `
+                    <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Overall Data Health</span><span class="font-bold ${healthScore > 90 ? 'text-green-600' : 'text-amber-600'}">${healthScore}%</span></div>
+                    <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Missing Ownership</span><span class="font-bold text-red-600">${missingOwnerCount} Assets</span></div>
+                    <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Unclassified Services</span><span class="font-bold text-amber-600">${unclassifiedCount} Assets</span></div>
+                `;
+
+                // 8. Recommended Actions
+                const actions = [];
+                if (totalPatchableRisk > 0) actions.push(`<strong>Prioritize Patching:</strong> Address the top 5 assets in the Patching Priority Queue to instantly reduce organizational risk by <strong>${formatNum(topPatch.reduce((sum, a) => sum + a.risk, 0))}</strong>.`);
+                if (missingOwnerCount > 0) actions.push(`<strong>Resolve Ownership:</strong> Assign owners to the <strong>${missingOwnerCount}</strong> orphaned assets to ensure accountability for their ${formatNum(totalRisk / (reg.length || 1) * missingOwnerCount)} estimated risk.`);
+                if (unclassifiedCount > 0) actions.push(`<strong>Service Classification:</strong> Map the <strong>${unclassifiedCount}</strong> unclassified assets to their parent services to enable accurate application-level risk reporting.`);
+                if (topTeams.length > 0) actions.push(`<strong>Targeted Remediation:</strong> The <strong>${topTeams[0].owner}</strong> team holds the highest combined operational risk and should be prioritized for remediation support this sprint.`);
+                
+                if (actions.length === 0) actions.push("No immediate governance actions required. The infrastructure is well-maintained.");
+                
+                document.getElementById('rpt-actions').innerHTML = actions.map(a => `<li>${a}</li>`).join('');
             }
         }
 
