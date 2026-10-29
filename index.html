@@ -584,9 +584,12 @@
                             <div><label class="block font-medium mb-1">Provider</label>
                                 <select id="ai-provider" onchange="app.aiProviderChanged()" class="w-full border rounded p-2"><option value="anthropic">Anthropic Claude</option><option value="gemini">Google Gemini</option><option value="openai">OpenAI-compatible (e.g. Ollama)</option></select></div>
                             <div id="ai-baseurl-row" class="hidden"><label class="block font-medium mb-1">Base URL</label>
-                                <input id="ai-baseurl" class="w-full border rounded p-2" placeholder="http://localhost:11434/v1"></div>
-                            <div><label class="block font-medium mb-1">Model</label><input id="ai-model" class="w-full border rounded p-2" placeholder=""></div>
-                            <div><label id="ai-key-label" class="block font-medium mb-1">API key</label><input id="ai-key" type="password" autocomplete="off" class="w-full border rounded p-2"></div>
+                                <input id="ai-baseurl" oninput="app.aiCredsChanged()" class="w-full border rounded p-2" placeholder="http://localhost:11434/v1"></div>
+                            <div><label class="block font-medium mb-1">Model</label>
+                                <div class="flex gap-2"><select id="ai-model" disabled class="flex-1 min-w-0 border rounded p-2 bg-white"><option value="">Enter the key or address first</option></select>
+                                    <button type="button" onclick="app.loadAIModels(true)" class="px-3 py-2 border rounded text-xs hover:bg-gray-50 whitespace-nowrap">Load models</button></div>
+                                <p id="ai-model-status" class="text-xs text-gray-500 mt-1"></p></div>
+                            <div><label id="ai-key-label" class="block font-medium mb-1">API key</label><input id="ai-key" type="password" autocomplete="off" oninput="app.aiCredsChanged()" class="w-full border rounded p-2"></div>
                         </div>
                     </details>
                     <label class="flex items-start gap-2"><input id="ai-web" type="checkbox" class="mt-1 rounded border-gray-300"><span>Use public sources: look up NVD, CISA KEV, EPSS, Red Hat and OSV for the CVEs involved (only CVE ids are sent), and let Claude or Gemini search the web</span></label>
@@ -1079,6 +1082,43 @@
                 try { json = JSON.parse(raw); } catch (e) { /* not JSON */ }
                 if (!res.ok) throw new Error(`${res.status} ${json.error?.message || json.error || raw.slice(0, 200)}`);
                 return json;
+            }
+
+            // The models this connector can actually use, straight from the service (no typing model names by hand).
+            static async listModels(s) {
+                const get = async (url, headers) => {
+                    let res;
+                    try { res = await fetch(url, { headers }); }
+                    catch (e) { throw new Error(`could not reach ${new URL(url).host} (${e.message})`); }
+                    const raw = await res.text();
+                    let json = {};
+                    try { json = JSON.parse(raw); } catch (e) { /* not JSON */ }
+                    if (!res.ok) throw new Error(`${res.status} ${json.error?.message || json.error || raw.slice(0, 120)}`);
+                    return json;
+                };
+                let out = [];
+                if (s.provider === 'anthropic') {
+                    const j = await get('https://api.anthropic.com/v1/models?limit=100', { 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' });
+                    out = (j.data || []).map(m => ({ id: m.id, label: m.display_name ? `${m.display_name} (${m.id})` : m.id }));
+                } else if (s.provider === 'gemini') {
+                    const j = await get('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { 'x-goog-api-key': s.apiKey });
+                    out = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+                        .map(m => { const id = String(m.name).replace(/^models\//, ''); return { id, label: m.displayName ? `${m.displayName} (${id})` : id }; });
+                } else {
+                    const base = s.baseUrl.replace(/\/+$/, '');
+                    const headers = s.apiKey ? { Authorization: 'Bearer ' + s.apiKey } : {};
+                    try {
+                        const j = await get(base + '/models', headers);
+                        out = (j.data || j.models || []).map(m => ({ id: m.id || m.name, label: m.id || m.name }));
+                    } catch (e) {
+                        // Ollama also answers on its own endpoint, one level up from /v1
+                        const j = await get(base.replace(/\/v1$/, '') + '/api/tags', headers).catch(() => { throw e; });
+                        out = (j.models || []).map(m => ({ id: m.name, label: m.name }));
+                    }
+                }
+                out = out.filter(m => m.id).sort((a, b) => a.label.localeCompare(b.label));
+                if (!out.length) throw new Error('the service returned no models');
+                return out;
             }
 
             // Remote providers. Claude and Gemini can search the web server-side when "web" is on.
@@ -2848,7 +2888,7 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 const s = AIService.load();
                 const $ = (id) => document.getElementById(id);
                 $('ai-provider').value = s.provider;
-                $('ai-model').value = s.model;
+                $('ai-model').innerHTML = s.model ? `<option value="${esc(s.model)}">${esc(s.model)}</option>` : '<option value="">Loading…</option>';
                 $('ai-baseurl').value = s.baseUrl;
                 $('ai-key').value = s.apiKey;
                 $('ai-anon').checked = s.anonymise;
@@ -2857,16 +2897,55 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 $('ai-test-result').textContent = '';
                 $('ai-chrome-progress').classList.add('hidden');
                 $('ai-keys').open = !!(s.apiKey || s.baseUrl);
-                this.aiProviderChanged();
+                this.aiProviderChanged(true);
                 $('modal-ai-settings').classList.remove('hidden');
                 this.refreshChromeStatus();
             }
 
-            aiProviderChanged() {
+            aiProviderChanged(keepModel = false) {
                 const p = document.getElementById('ai-provider').value;
                 document.getElementById('ai-baseurl-row').classList.toggle('hidden', p !== 'openai');
-                document.getElementById('ai-model').placeholder = AIService.DEFAULT_MODELS[p] || 'model name, e.g. gpt-oss:latest';
                 document.getElementById('ai-key-label').textContent = p === 'openai' ? 'API key (optional)' : 'API key';
+                // models belong to a provider: a switch starts a fresh list
+                if (keepModel !== true) document.getElementById('ai-model').innerHTML = '<option value="">Loading…</option>';
+                this.loadAIModels();
+            }
+
+            // Called as the key or address is typed: reload the list once typing stops.
+            aiCredsChanged() {
+                clearTimeout(this._aiModelTimer);
+                this._aiModelTimer = setTimeout(() => this.loadAIModels(), 700);
+            }
+
+            async loadAIModels(manual = false) {
+                const $ = (id) => document.getElementById(id);
+                const s = this.readAISettings();
+                const sel = $('ai-model'), st = $('ai-model-status');
+                const saved = AIService.load();
+                const want = sel.value || (saved.provider === s.provider ? saved.model : '');
+                const ready = s.provider === 'openai' ? !!s.baseUrl : !!s.apiKey;
+                const say = (cls, t) => { st.className = 'text-xs mt-1 ' + cls; st.textContent = t; };
+                const token = this._aiModelToken = (this._aiModelToken || 0) + 1; // ignore answers from superseded requests
+                if (!ready) {
+                    sel.innerHTML = `<option value="">Enter ${s.provider === 'openai' ? 'the server address' : 'the API key'} first</option>`;
+                    sel.disabled = true; say('text-gray-500', '');
+                    return;
+                }
+                sel.disabled = true;
+                say('text-gray-500', 'Loading models…');
+                try {
+                    const list = await AIService.listModels(s);
+                    if (token !== this._aiModelToken) return;
+                    const pref = [want, AIService.DEFAULT_MODELS[s.provider]].find(id => id && list.some(m => m.id === id)) || list[0].id;
+                    sel.innerHTML = list.map(m => `<option value="${esc(m.id)}"${m.id === pref ? ' selected' : ''}>${esc(m.label)}</option>`).join('');
+                    sel.disabled = false;
+                    say('text-green-700', `${list.length} model${list.length === 1 ? '' : 's'} available.`);
+                } catch (e) {
+                    if (token !== this._aiModelToken) return;
+                    sel.innerHTML = want ? `<option value="${esc(want)}">${esc(want)} (saved; list unavailable)</option>` : '<option value="">No models loaded</option>';
+                    sel.disabled = !want;
+                    say('text-red-700', `Could not load models: ${e.message}`);
+                }
             }
 
             readAISettings() {
@@ -2887,6 +2966,8 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 const say = (cls, t) => { $('ai-test-result').className = 'text-xs mt-2 ' + cls; $('ai-test-result').textContent = t; };
                 say('text-gray-600', 'Testing…');
                 try {
+                    const cur = this.readAISettings();
+                    if (!cur.preferChrome && !cur.model) throw new Error('Pick a model first (enter the key or address, then choose from the list).');
                     const eng = await AIService.resolve();
                     if (!eng) throw new Error("No engine available: Chrome's built-in model is not usable here and no hosted provider is complete.");
                     const r = eng.kind === 'chrome'
