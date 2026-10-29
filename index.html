@@ -850,7 +850,15 @@
 
             switchView(viewId) {
                 document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-                document.getElementById('view-' + viewId).classList.add('active');
+                
+                const target = document.getElementById('view-' + viewId);
+                if (!target) {
+                    console.error('Missing view:', viewId);
+                    return;
+                }
+                
+                target.classList.add('active');
+                
                 if (viewId === 'dashboard') this.renderDashboard();
                 if (viewId === 'review') this.renderReviewQueue();
                 if (viewId === 'register') this.renderRegister();
