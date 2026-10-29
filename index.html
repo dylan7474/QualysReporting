@@ -30,6 +30,7 @@
                 <span id="nav-review-badge" class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full hidden">0</span>
             </button>
             <button onclick="app.switchView('register')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🗄️ Asset Register</button>
+            <button onclick="app.switchView('vuln')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🛡️ Vuln Management</button>
             <button onclick="app.switchView('health')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🩺 Data Health</button>
             <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Governance Report</button>
         </nav>
@@ -233,28 +234,69 @@
                 </div>
             </section>
 
-        </div>
-
-        <!-- Bulk Action Confirmation Modal -->
-        <div id="modal-bulk-confirm" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Confirm Bulk Action</h3>
-                <div class="mb-4 text-sm text-gray-700 space-y-3">
-                    <p>You are about to classify: <strong id="bulk-confirm-count" class="text-xl text-blue-600 ml-1">0</strong> assets</p>
-                    <div class="bg-gray-50 p-3 rounded border">
-                        <p>Action: <strong id="bulk-confirm-action" class="uppercase"></strong></p>
-                        <p id="bulk-confirm-owner-wrap" class="mt-1">Target Owner: <strong id="bulk-confirm-owner"></strong></p>
+            <!-- VIEW: VULNERABILITIES -->
+            <section id="view-vuln" class="view-section space-y-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-xl font-semibold">Vulnerability Management</h3>
+                        <p class="text-sm text-gray-500 mt-1">Import Qualys Vulnerability exports and prioritize by Asset exposure.</p>
                     </div>
                     <div>
-                        <p class="font-medium text-gray-800">Service Types included:</p>
-                        <p class="text-gray-600 mt-1" id="bulk-confirm-services"></p>
+                        <input type="file" id="vuln-file-input" accept=".csv" class="hidden" onchange="app.importVulnData(event)">
+                        <label for="vuln-file-input" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 shadow-sm font-medium cursor-pointer flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                            Import Vuln CSV
+                        </label>
                     </div>
                 </div>
-                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
-                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
-                    <button onclick="app.executeBulkAction()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium text-sm shadow transition">Proceed with Action</button>
+
+                <div id="vuln-import-result" class="text-sm text-emerald-700 font-medium bg-emerald-50 p-3 rounded border border-emerald-200 hidden"></div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500 col-span-3">
+                        <h4 class="font-bold text-gray-800 mb-4 border-b pb-2">Platform Vulnerability Summary</h4>
+                        <div class="grid grid-cols-4 gap-4 text-center" id="vuln-summary-metrics">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6 border md:col-span-2">
+                        <h4 class="font-bold text-gray-800 mb-4 border-b pb-2">Top 10 Assets by Risk</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm text-left">
+                                <thead class="bg-gray-50 text-gray-600 border-b">
+                                    <tr>
+                                        <th class="px-4 py-2">Asset Name</th>
+                                        <th class="px-4 py-2">Owner</th>
+                                        <th class="px-4 py-2">Exposure</th>
+                                        <th class="px-4 py-2 text-center">Vulns</th>
+                                        <th class="px-4 py-2 text-right">Weighted Risk</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vuln-top-assets" class="divide-y">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6 border md:col-span-1">
+                        <h4 class="font-bold text-gray-800 mb-4 border-b pb-2">Top 10 CVEs by Impact</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm text-left">
+                                <thead class="bg-gray-50 text-gray-600 border-b">
+                                    <tr>
+                                        <th class="px-4 py-2">CVE</th>
+                                        <th class="px-4 py-2 text-right">Total Impact</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vuln-top-cves" class="divide-y">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
+
         </div>
 
         <!-- Bulk Action Report Modal -->
@@ -390,7 +432,8 @@
                 REVIEW_QUEUE: 'gov_review_queue',
                 OWNERSHIP_LEDGER: 'gov_ownership_ledger',
                 RECONCILIATION_RUNS: 'gov_recon_runs',
-                PLATFORM_INVENTORY: 'gov_platform_inventory'
+                PLATFORM_INVENTORY: 'gov_platform_inventory',
+                VULNERABILITY_REGISTER: 'gov_vuln_register'
             };
 
             static load(key) {
@@ -409,6 +452,7 @@
                     ownershipLedger: this.load(this.KEYS.OWNERSHIP_LEDGER),
                     reconciliationRuns: this.load(this.KEYS.RECONCILIATION_RUNS),
                     platformInventory: this.load(this.KEYS.PLATFORM_INVENTORY),
+                    vulnerabilityRegister: this.load(this.KEYS.VULNERABILITY_REGISTER),
                     exportDate: new Date().toISOString(),
                     version: '2.0'
                 };
@@ -808,6 +852,7 @@
                     'import': 'Data Ingestion',
                     'review': 'Triage & Review Queue',
                     'register': 'Authoritative Asset Register',
+                    'vuln': 'Vulnerability Management',
                     'health': 'Data Integrity & Health',
                     'reports': 'Governance Reports'
                 };
@@ -816,6 +861,7 @@
                 if (viewId === 'dashboard') this.renderDashboard();
                 if (viewId === 'review') this.renderReviewQueue();
                 if (viewId === 'register') this.renderRegister();
+                if (viewId === 'vuln') this.renderVulnDashboard();
                 if (viewId === 'health') this.renderHealth();
                 if (viewId === 'reports') this.renderReports();
             }
@@ -1153,6 +1199,163 @@
 
             exportDatabase() {
                 StorageService.exportDatabase();
+            }
+
+            importVulnData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const resDiv = document.getElementById('vuln-import-result');
+                resDiv.classList.add('hidden');
+
+                Papa.parse(file, {
+                    header: false,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        let headerIdx = -1;
+                        for(let i=0; i<Math.min(20, results.data.length); i++) {
+                            if(results.data[i].some(c => /^(qid|cve(.?id)?|asset.?name)$/i.test(String(c).trim()))) {
+                                headerIdx = i;
+                                break;
+                            }
+                        }
+
+                        if(headerIdx === -1) {
+                            resDiv.innerHTML = '❌ Could not detect vulnerability headers in CSV.';
+                            resDiv.className = 'text-sm font-medium p-3 rounded border text-red-700 bg-red-50 border-red-200 mt-4';
+                            return;
+                        }
+
+                        const headers = results.data[headerIdx].map(h => String(h).trim().toLowerCase());
+                        const getCol = (regex) => headers.findIndex(h => regex.test(h));
+
+                        const map = {
+                            assetName: getCol(/^(asset.?name|hostname)$/i),
+                            qid: getCol(/^qid$/i),
+                            cve: getCol(/^cve(.?id)?$/i),
+                            severity: getCol(/^severity$/i),
+                            cvss: getCol(/^cvss/i),
+                            truRisk: getCol(/^trurisk/i),
+                            firstDetected: getCol(/^first.?detected/i),
+                            lastDetected: getCol(/^last.?detected/i)
+                        };
+
+                        if(map.assetName === -1 || map.qid === -1) {
+                            resDiv.innerHTML = '❌ CSV is missing required columns (Asset Name or QID).';
+                            resDiv.className = 'text-sm font-medium p-3 rounded border text-red-700 bg-red-50 border-red-200 mt-4';
+                            return;
+                        }
+
+                        const vulns = [];
+                        for(let i=headerIdx+1; i<results.data.length; i++) {
+                            const row = results.data[i];
+                            const rawName = row[map.assetName];
+                            if(!rawName) continue;
+                            
+                            vulns.push({
+                                normalizedName: AssetIdentityService.normalize(rawName),
+                                qid: row[map.qid],
+                                cve: map.cve !== -1 ? row[map.cve] : '',
+                                severity: map.severity !== -1 ? parseFloat(row[map.severity]) || 0 : 0,
+                                cvss: map.cvss !== -1 ? parseFloat(row[map.cvss]) || 0 : 0,
+                                truRisk: map.truRisk !== -1 ? parseFloat(row[map.truRisk]) || 0 : 0,
+                                firstDetected: map.firstDetected !== -1 ? row[map.firstDetected] : '',
+                                lastDetected: map.lastDetected !== -1 ? row[map.lastDetected] : ''
+                            });
+                        }
+
+                        StorageService.save(StorageService.KEYS.VULNERABILITY_REGISTER, vulns);
+                        
+                        resDiv.innerHTML = `✅ Successfully imported and mapped <strong>${vulns.length}</strong> vulnerability records.`;
+                        resDiv.className = 'text-sm font-medium p-3 rounded border text-emerald-700 bg-emerald-50 border-emerald-200 mt-4';
+                        
+                        this.renderVulnDashboard();
+                    }
+                });
+            }
+
+            renderVulnDashboard() {
+                const vulns = StorageService.load(StorageService.KEYS.VULNERABILITY_REGISTER);
+                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                
+                const assetMap = {};
+                register.forEach(r => assetMap[r.normalizedName] = r);
+
+                const assetRiskMap = {};
+                const cveImpactMap = {};
+                
+                let platformVulnCount = 0;
+                let platformHighSevCount = 0;
+                let platformTotalRisk = 0;
+
+                vulns.forEach(v => {
+                    const asset = assetMap[v.normalizedName];
+                    if (!asset) return; // Strict Match: Only assess vulns on governed assets
+
+                    const expMult = RiskScoringEngine.getMultiplier(asset.exposure);
+                    const weightedRisk = v.truRisk * expMult;
+
+                    if (!assetRiskMap[v.normalizedName]) {
+                        assetRiskMap[v.normalizedName] = { 
+                            name: v.normalizedName, 
+                            owner: asset.owner || 'Unknown',
+                            exposure: asset.exposure || 'Unknown',
+                            vulnCount: 0, 
+                            totalWeightedRisk: 0 
+                        };
+                    }
+                    assetRiskMap[v.normalizedName].vulnCount++;
+                    assetRiskMap[v.normalizedName].totalWeightedRisk += weightedRisk;
+
+                    if (v.cve && v.cve !== 'N/A' && v.cve !== '-') {
+                        const cves = v.cve.split(',').map(c => c.trim());
+                        cves.forEach(c => {
+                            if(!cveImpactMap[c]) cveImpactMap[c] = 0;
+                            cveImpactMap[c] += weightedRisk;
+                        });
+                    }
+
+                    if (asset.owner === 'Platform') {
+                        platformVulnCount++;
+                        if (v.severity >= 4 || v.cvss >= 7.0 || v.truRisk >= 700) platformHighSevCount++;
+                        platformTotalRisk += weightedRisk;
+                    }
+                });
+
+                const topAssets = Object.values(assetRiskMap).sort((a, b) => b.totalWeightedRisk - a.totalWeightedRisk).slice(0, 10);
+                const assetTbody = document.getElementById('vuln-top-assets');
+                if (assetTbody) {
+                    assetTbody.innerHTML = topAssets.map(a => `
+                        <tr>
+                            <td class="px-4 py-2 font-medium text-slate-800">${a.name}</td>
+                            <td class="px-4 py-2"><span class="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded font-semibold uppercase">${a.owner}</span></td>
+                            <td class="px-4 py-2 text-slate-600 text-xs">${a.exposure}</td>
+                            <td class="px-4 py-2 text-slate-600 text-center">${a.vulnCount}</td>
+                            <td class="px-4 py-2 text-right font-bold text-red-600">${Math.round(a.totalWeightedRisk)}</td>
+                        </tr>
+                    `).join('') || `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500 italic">No vulnerabilities matched to Asset Register.</td></tr>`;
+                }
+
+                const topCVEs = Object.entries(cveImpactMap).map(([cve, impact]) => ({cve, impact})).sort((a, b) => b.impact - a.impact).slice(0, 10);
+                const cveTbody = document.getElementById('vuln-top-cves');
+                if (cveTbody) {
+                    cveTbody.innerHTML = topCVEs.map(c => `
+                        <tr>
+                            <td class="px-4 py-2 font-medium text-slate-800">${c.cve}</td>
+                            <td class="px-4 py-2 text-right font-bold text-red-600">${Math.round(c.impact)}</td>
+                        </tr>
+                    `).join('') || `<tr><td colspan="2" class="px-4 py-8 text-center text-gray-500 italic">No CVE data extracted.</td></tr>`;
+                }
+
+                const summaryDiv = document.getElementById('vuln-summary-metrics');
+                if (summaryDiv) {
+                    summaryDiv.innerHTML = `
+                        <div class="p-4 bg-gray-50 rounded border"><p class="text-xs uppercase text-gray-500 font-semibold tracking-wide">Total Platform Vulns</p><p class="text-3xl font-bold text-gray-900 mt-1">${platformVulnCount}</p></div>
+                        <div class="p-4 bg-red-50 rounded border border-red-100"><p class="text-xs uppercase text-red-600 font-semibold tracking-wide">High/Crit Severity</p><p class="text-3xl font-bold text-red-700 mt-1">${platformHighSevCount}</p></div>
+                        <div class="p-4 bg-gray-50 rounded border"><p class="text-xs uppercase text-gray-500 font-semibold tracking-wide">Agg. Weighted Risk</p><p class="text-3xl font-bold text-gray-900 mt-1">${Math.round(platformTotalRisk)}</p></div>
+                        <div class="p-4 bg-gray-50 rounded border"><p class="text-xs uppercase text-gray-500 font-semibold tracking-wide">Assets Impacted</p><p class="text-3xl font-bold text-gray-900 mt-1">${Object.values(assetRiskMap).filter(a => a.owner === 'Platform').length}</p></div>
+                    `;
+                }
             }
 
             promptReset() {
