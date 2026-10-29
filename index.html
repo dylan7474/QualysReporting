@@ -142,97 +142,18 @@
                             </div>
                             <button onclick="app.switchView('review')" class="w-full bg-slate-800 text-white py-3 rounded hover:bg-slate-700 font-medium">Go to Review Queue</button>
                         </div>
-                    </div>
-                </div>
-            </section>
+                        
+                        <!-- Secondary Source: Platform Inventory -->
+                        <div class="mt-8 border-t border-gray-200 pt-8">
+                            <h3 class="text-lg font-semibold mb-2">Platform Inventory Source</h3>
+                            <p class="text-gray-600 mb-4 text-sm">Upload a CSV or JSON containing known Platform assets to improve automatic ownership resolution. This serves as the secondary source of truth after the Asset Register.</p>
+                            <input type="file" id="inventory-file-input" accept=".csv,.json" class="hidden" onchange="app.importController.handleInventoryFile(event)">
+                            <label for="inventory-file-input" class="inline-block cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 text-sm font-medium transition shadow-sm">
+                                📤 Upload Platform Inventory
+                            </label>
+                            <div id="inventory-import-result" class="text-sm text-emerald-700 font-medium mt-3 hidden bg-emerald-50 p-3 rounded border border-emerald-200"></div>
+                        </div>
 
-            <!-- VIEW: REVIEW QUEUE -->
-            <section id="view-review" class="view-section h-full flex flex-col">
-                <div class="flex justify-between items-end mb-4">
-                    <h3 class="text-xl font-semibold">Triage & Review Queue</h3>
-                </div>
-                
-                <!-- Analytics Cards -->
-                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4" id="review-analytics">
-                    <!-- Injected dynamically -->
-                </div>
-
-                <!-- Filters & Bulk Actions -->
-                <div class="bg-white p-4 rounded-lg shadow mb-4 flex flex-col space-y-3 border border-gray-200">
-                    <div class="flex flex-wrap gap-4 items-end">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Queue State</label>
-                            <select id="review-filter-state" class="border-gray-300 rounded text-sm py-1.5 pl-2 pr-8 shadow-sm" onchange="app.updateReviewFilters()">
-                                <option value="ALL">All States</option>
-                                <option value="PENDING" selected>Pending</option>
-                                <option value="IN_REVIEW">In Review</option>
-                                <option value="ESCALATED">Escalated</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Suggested Owner</label>
-                            <select id="review-filter-owner" class="border-gray-300 rounded text-sm py-1.5 pl-2 pr-8 shadow-sm" onchange="app.updateReviewFilters()">
-                                <option value="ALL">All Owners</option>
-                                <option value="Platform">Platform</option>
-                                <option value="CORP">CORP</option>
-                                <option value="Unknown">Unknown</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Service Type</label>
-                            <select id="review-filter-service" class="border-gray-300 rounded text-sm py-1.5 pl-2 pr-8 shadow-sm" onchange="app.updateReviewFilters()">
-                                <option value="ALL">All Services</option>
-                                <option value="Active Directory">Active Directory</option>
-                                <option value="Monitoring">Monitoring</option>
-                                <option value="Database">Database</option>
-                                <option value="Backup">Backup</option>
-                                <option value="DNS">DNS</option>
-                                <option value="SMTP">SMTP</option>
-                                <option value="Unclassified">Unclassified</option>
-                            </select>
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Search Assets</label>
-                            <input type="text" id="review-filter-search" placeholder="Search by name, IP, or service..." class="border-gray-300 rounded text-sm px-3 py-1.5 w-full shadow-sm" oninput="app.updateReviewFilters()">
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-center justify-between pt-3 border-t border-gray-100">
-                        <div class="space-x-2 text-sm flex items-center">
-                            <span class="font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded">Selected: <span id="review-selected-count" class="text-blue-600 font-bold">0</span></span>
-                            <button onclick="app.selectAllFilteredReviews()" class="text-blue-600 hover:text-blue-800 font-medium px-2 py-1 transition">Select All Filtered</button>
-                            <button onclick="app.clearReviewSelection()" class="text-gray-500 hover:text-gray-700 font-medium px-2 py-1 transition">Select None</button>
-                        </div>
-                        <div class="space-x-2 flex">
-                            <button onclick="app.promptBulkAction('APPROVE', 'Platform')" class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition">Approve Platform</button>
-                            <button onclick="app.promptBulkAction('APPROVE', 'CORP')" class="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-indigo-700 shadow-sm transition">Approve CORP</button>
-                            <button onclick="app.promptBulkAction('APPROVE', 'NOPS')" class="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 shadow-sm transition">Approve NOPS</button>
-                            <span class="border-l border-gray-300 mx-1"></span>
-                            <button onclick="app.promptBulkAction('REJECT', 'Unknown')" class="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 shadow-sm transition">Reject</button>
-                            <button onclick="app.promptBulkAction('ESCALATE', 'Unknown')" class="bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-amber-600 shadow-sm transition">Escalate</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col border border-gray-200">
-                    <div class="overflow-auto flex-1">
-                        <table class="min-w-full text-left text-sm whitespace-nowrap">
-                            <thead class="bg-gray-100 text-gray-600 border-b sticky top-0 z-10">
-                                <tr>
-                                    <th class="px-4 py-3 w-10 text-center">
-                                        <input type="checkbox" id="review-select-all-visible" onchange="app.toggleSelectVisibleReviews()" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 cursor-pointer">
-                                    </th>
-                                    <th class="px-4 py-3">Asset Identity</th>
-                                    <th class="px-4 py-3">Suggested Owner</th>
-                                    <th class="px-4 py-3">Service Infer.</th>
-                                    <th class="px-4 py-3">Status</th>
-                                    <th class="px-4 py-3 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="review-queue-tbody" class="divide-y">
-                                <!-- Queue items go here -->
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </section>
@@ -253,6 +174,7 @@
                                     <th class="px-6 py-3">Service</th>
                                     <th class="px-6 py-3">Env</th>
                                     <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3">Exposure & Risk</th>
                                     <th class="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -411,6 +333,26 @@
                             <input type="text" id="edit-asset-service" class="w-full border-gray-300 rounded shadow-sm py-1.5 px-3 focus:ring-blue-500 focus:border-blue-500 border">
                         </div>
                     </div>
+                    <div class="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Exposure</label>
+                            <select id="edit-asset-exposure" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
+                                <option value="Internal">Internal</option>
+                                <option value="DMZ">DMZ</option>
+                                <option value="Internet Facing">Internet Facing</option>
+                                <option value="Unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Service Criticality</label>
+                            <select id="edit-asset-criticality" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Mission Critical">Mission Critical</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3">
                     <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 font-medium transition">Cancel</button>
@@ -447,7 +389,8 @@
                 ASSET_REGISTER: 'gov_asset_register',
                 REVIEW_QUEUE: 'gov_review_queue',
                 OWNERSHIP_LEDGER: 'gov_ownership_ledger',
-                RECONCILIATION_RUNS: 'gov_recon_runs'
+                RECONCILIATION_RUNS: 'gov_recon_runs',
+                PLATFORM_INVENTORY: 'gov_platform_inventory'
             };
 
             static load(key) {
@@ -465,6 +408,7 @@
                     reviewQueue: this.load(this.KEYS.REVIEW_QUEUE),
                     ownershipLedger: this.load(this.KEYS.OWNERSHIP_LEDGER),
                     reconciliationRuns: this.load(this.KEYS.RECONCILIATION_RUNS),
+                    platformInventory: this.load(this.KEYS.PLATFORM_INVENTORY),
                     exportDate: new Date().toISOString(),
                     version: '2.0'
                 };
@@ -490,6 +434,21 @@
                     if (n.endsWith(d)) n = n.slice(0, -d.length);
                 });
                 return n.replace(/\.+$/, '').replace(/\s+/g, '-');
+            }
+        }
+
+        class RiskScoringEngine {
+            static getMultiplier(exposure) {
+                switch(exposure) {
+                    case 'Internet Facing': return 2.0;
+                    case 'DMZ': return 1.5;
+                    case 'Internal': return 1.0;
+                    default: return 1.0;
+                }
+            }
+
+            static calculateEffectiveRisk(baseScore, exposure) {
+                return (baseScore || 0) * this.getMultiplier(exposure);
             }
         }
 
@@ -553,6 +512,7 @@
                         originalName: asset.assetName,
                         ipAddress: asset.ipAddress,
                         detectedService: asset.inferredService,
+                        suggestedOwner: asset.suggestedOwner || 'Unknown',
                         status: this.STATES.PENDING,
                         reason: reason,
                         addedDate: new Date().toISOString(),
@@ -585,6 +545,7 @@
                     if (decisionStatus === this.STATES.APPROVED) {
                         const existingIdx = register.findIndex(r => r.normalizedName === item.normalizedName);
                         
+                        const baseRisk = item.qualysData?.truRiskScore || 0;
                         const newRecord = {
                             normalizedName: item.normalizedName,
                             originalName: item.originalName,
@@ -592,6 +553,11 @@
                             service: finalService,
                             status: 'Approved',
                             environment: 'Production',
+                            exposure: 'Unknown',
+                            criticality: 'Medium',
+                            baseRiskScore: baseRisk,
+                            exposureMultiplier: RiskScoringEngine.getMultiplier('Unknown'),
+                            effectiveRiskScore: RiskScoringEngine.calculateEffectiveRisk(baseRisk, 'Unknown'),
                             decisionDate: new Date().toISOString(),
                             lastSeen: new Date().toISOString()
                         };
@@ -610,6 +576,8 @@
             static run(importedAssets) {
                 const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 const registerKeys = new Set(register.map(r => r.normalizedName));
+                const platformInventory = StorageService.load(StorageService.KEYS.PLATFORM_INVENTORY);
+                const platformKeys = new Set(platformInventory);
                 
                 let newCount = 0;
                 let dedupeCount = 0;
@@ -628,6 +596,19 @@
                 uniqueAssets.forEach(asset => {
                     totalProcessed++;
                     if (!registerKeys.has(asset.normalizedName)) {
+                        
+                        // Ownership Triage Resolver
+                        let suggestedOwner = 'Unknown';
+                        if (platformKeys.has(asset.normalizedName)) {
+                            suggestedOwner = 'Platform'; // Secondary Source Hit
+                        } else {
+                            // Tertiary Fallback: Naming Conventions
+                            const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(asset.inferredService);
+                            if (isPlatformService) suggestedOwner = 'Platform';
+                            else if (asset.inferredService === 'Active Directory') suggestedOwner = 'CORP';
+                        }
+                        asset.suggestedOwner = suggestedOwner;
+
                         const added = ReviewQueueService.enqueue(asset, "Newly discovered in Qualys");
                         if (added) newCount++;
                     } else {
@@ -741,7 +722,8 @@
                         ipAddress: this.mappedHeaders.ipAddress !== undefined ? row[keys[this.mappedHeaders.ipAddress]] : '',
                         operatingSystem: this.mappedHeaders.operatingSystem !== undefined ? row[keys[this.mappedHeaders.operatingSystem]] : '',
                         tags: rawTags,
-                        inferredService: ServiceClassificationEngine.infer(rawName, rawTags)
+                        inferredService: ServiceClassificationEngine.infer(rawName, rawTags),
+                        truRiskScore: this.mappedHeaders.truRiskScore !== undefined ? parseFloat(row[keys[this.mappedHeaders.truRiskScore]]) || 0 : 0
                     };
                 }).filter(a => a.normalizedName !== 'unknown-asset' && a.normalizedName !== '');
 
@@ -756,6 +738,39 @@
                 document.getElementById('res-missing').textContent = results.missingCount;
 
                 this.app.updateGlobalBadges();
+            }
+
+            handleInventoryFile(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    let names = [];
+                    
+                    if (file.name.endsWith('.json')) {
+                        try {
+                            const data = JSON.parse(content);
+                            names = data.map(item => typeof item === 'string' ? item : (item.assetName || item.name || ''));
+                        } catch(err) { alert("Invalid JSON file."); return; }
+                    } else {
+                        const results = Papa.parse(content, { header: true, skipEmptyLines: true });
+                        if (results.data.length > 0) {
+                            const keys = Object.keys(results.data[0]);
+                            const nameKey = keys.find(k => /name|host/i.test(k)) || keys[0];
+                            names = results.data.map(row => row[nameKey]);
+                        }
+                    }
+                    
+                    const normalizedNames = names.map(n => AssetIdentityService.normalize(n)).filter(n => n !== 'unknown-asset' && n !== '');
+                    StorageService.save(StorageService.KEYS.PLATFORM_INVENTORY, normalizedNames);
+                    
+                    const resDiv = document.getElementById('inventory-import-result');
+                    resDiv.innerHTML = `✅ Successfully imported and synchronized <strong>${normalizedNames.length}</strong> platform assets to the secondary discovery list.`;
+                    resDiv.classList.remove('hidden');
+                };
+                reader.readAsText(file);
             }
         }
 
@@ -839,8 +854,7 @@
                 const counts = { Platform: 0, CORP: 0, Unknown: 0, Monitoring: 0, Database: 0, 'Active Directory': 0 };
                 
                 active.forEach(q => {
-                    const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(q.detectedService);
-                    const owner = isPlatformService ? 'Platform' : (q.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
+                    const owner = q.suggestedOwner || 'Unknown';
                     if (counts[owner] !== undefined) counts[owner]++;
                     if (counts[q.detectedService] !== undefined) counts[q.detectedService]++;
                 });
@@ -897,7 +911,7 @@
 
                 let filtered = queue.filter(q => {
                     const matchState = this.reviewState.filters.state === 'ALL' || q.status === this.reviewState.filters.state;
-                    const inferredOwner = ['Monitoring', 'Backup', 'Database'].includes(q.detectedService) ? 'Platform' : (q.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
+                    const inferredOwner = q.suggestedOwner || 'Unknown';
                     const matchOwner = this.reviewState.filters.owner === 'ALL' || inferredOwner === this.reviewState.filters.owner;
                     const matchService = this.reviewState.filters.service === 'ALL' || q.detectedService === this.reviewState.filters.service;
                     const search = this.reviewState.filters.search.toLowerCase();
@@ -917,8 +931,7 @@
                 }
 
                 filtered.forEach(item => {
-                    const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(item.detectedService);
-                    const suggestedOwner = isPlatformService ? 'Platform' : (item.detectedService === 'Active Directory' ? 'CORP' : 'Unknown');
+                    const suggestedOwner = item.suggestedOwner || 'Unknown';
                     const isChecked = this.reviewState.selectedIds.has(item.id) ? 'checked' : '';
                     const tr = document.createElement('tr');
                     tr.className = `transition ${this.reviewState.selectedIds.has(item.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50 cursor-pointer'}`;
@@ -1024,6 +1037,8 @@
                 document.getElementById('edit-asset-service').value = asset.service || '';
                 document.getElementById('edit-asset-env').value = asset.environment || 'Prod';
                 document.getElementById('edit-asset-status').value = asset.status || 'Approved';
+                document.getElementById('edit-asset-exposure').value = asset.exposure || 'Unknown';
+                document.getElementById('edit-asset-criticality').value = asset.criticality || 'Medium';
                 
                 document.getElementById('modal-edit-asset').classList.remove('hidden');
             }
@@ -1038,6 +1053,9 @@
                     register[idx].service = document.getElementById('edit-asset-service').value;
                     register[idx].environment = document.getElementById('edit-asset-env').value;
                     register[idx].status = document.getElementById('edit-asset-status').value;
+                    register[idx].exposure = document.getElementById('edit-asset-exposure').value;
+                    register[idx].criticality = document.getElementById('edit-asset-criticality').value;
+                    register[idx].effectiveRiskScore = RiskScoringEngine.calculateEffectiveRisk(register[idx].baseRiskScore, register[idx].exposure);
                     StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
                     
                     this.renderRegister();
@@ -1089,6 +1107,10 @@
                         <td class="px-6 py-3 text-slate-600 text-sm">${r.service || 'Unknown'}</td>
                         <td class="px-6 py-3 text-slate-500 text-sm">${r.environment || 'Prod'}</td>
                         <td class="px-6 py-3"><span class="${statusClass} text-xs px-2 py-1 rounded">${r.status || 'Active'}</span></td>
+                        <td class="px-6 py-3 text-sm text-slate-600">
+                            <div>Exp: <span class="font-medium">${r.exposure || 'Unknown'}</span></div>
+                            <div class="text-xs">Risk: <span class="font-bold ${r.effectiveRiskScore > 0 ? 'text-red-600' : 'text-gray-500'}">${r.effectiveRiskScore || 0}</span></div>
+                        </td>
                         <td class="px-6 py-3 text-right space-x-3">
                             <button onclick="app.editAsset('${r.normalizedName}')" class="text-blue-700 bg-blue-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-200 hover:text-blue-900 transition">Edit</button>
                             <button onclick="app.promptDeleteAsset('${r.normalizedName}')" class="text-red-700 bg-red-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-200 hover:text-red-900 transition">Delete</button>
