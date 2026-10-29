@@ -4,13 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Platform Infrastructure Governance Portal</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PapaParse for robust CSV processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        /* Strictly enforces hiding inactive sections */
         .view-section:not(.active) { display: none !important; }
     </style>
 </head>
@@ -24,7 +21,7 @@
         </div>
         <nav class="flex-1 overflow-y-auto py-4 space-y-1">
             <button onclick="app.switchView('dashboard')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📊 Dashboard</button>
-            <button onclick="app.switchView('import')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📥 Import Qualys Data</button>
+            <button onclick="app.switchView('import')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📥 Import Data</button>
             <button onclick="app.switchView('review')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition flex justify-between items-center">
                 <span>📋 Review Queue</span>
                 <span id="nav-review-badge" class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full hidden">0</span>
@@ -46,17 +43,16 @@
         <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-0">
             <h2 id="page-title" class="text-2xl font-semibold text-gray-800">Dashboard</h2>
             <div class="flex items-center space-x-4">
-                <span class="text-sm text-gray-500" id="last-sync-label">Last Sync: Never</span>
+                <span class="text-sm text-gray-500" id="last-sync-label">Local Browser Instance</span>
             </div>
         </header>
 
-        <!-- Dynamic Views -->
+        <!-- Dynamic Views Container -->
         <div class="flex-1 overflow-y-auto p-8" id="view-container">
             
             <!-- VIEW: DASHBOARD -->
             <section id="view-dashboard" class="view-section active space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <!-- KPIs -->
                     <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
                         <p class="text-sm text-gray-500 font-medium uppercase">Total Assets</p>
                         <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-total-assets">0</p>
@@ -74,12 +70,9 @@
                         <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-health-score">100%</p>
                     </div>
                 </div>
-                
                 <div class="bg-white rounded-lg shadow p-6 mt-8">
                     <h3 class="text-lg font-semibold border-b pb-4 mb-4">Recommended Actions</h3>
-                    <ul id="dashboard-actions" class="space-y-3 text-sm text-gray-700">
-                        <li class="text-gray-500 italic">No pending actions. You're all caught up.</li>
-                    </ul>
+                    <ul id="dashboard-actions" class="space-y-3 text-sm text-gray-700"></ul>
                 </div>
             </section>
 
@@ -88,7 +81,7 @@
                 <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
                     <div class="p-8">
                         <h3 class="text-xl font-semibold mb-2">Qualys Asset Import Wizard</h3>
-                        <p class="text-gray-600 mb-6 text-sm">Upload your RFC4180-compliant Qualys Asset Export CSV. The system will automatically map fields, deduplicate entries, and trigger reconciliation.</p>
+                        <p class="text-gray-600 mb-6 text-sm">Upload Qualys Asset Export CSV. The system automatically detects data structure and maps fields.</p>
                         
                         <!-- Step 1: Upload -->
                         <div id="import-step-1" class="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:bg-gray-50 transition cursor-pointer">
@@ -96,80 +89,61 @@
                             <label for="csv-file-input" class="cursor-pointer flex flex-col items-center justify-center">
                                 <svg class="w-12 h-12 text-blue-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                                 <span class="font-medium text-gray-900">Click to upload CSV</span>
-                                <span class="text-sm text-gray-500 mt-1">Supports large Qualys exports (2000+ assets)</span>
                             </label>
                         </div>
 
-                        <!-- Step 2: Mapping / Validation -->
+                        <!-- Step 2: Validation -->
                         <div id="import-step-2" class="hidden space-y-6">
-                            <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800 flex flex-col space-y-3">
-                                <div class="flex justify-between items-center">
-                                    <span><strong id="import-rows-detected">0</strong> asset rows detected. Auto-mapping applied.</span>
-                                    <button onclick="app.importController.executeImport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow-sm font-medium">Execute Import & Reconcile</button>
+                            <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800 flex justify-between items-center">
+                                <div>
+                                    <span><strong id="import-rows-detected">0</strong> asset rows detected.</span>
+                                    <div class="text-xs text-blue-700">Header row: <strong id="import-header-row">1</strong></div>
                                 </div>
-                                <div class="text-xs text-blue-700 font-medium">CSV Header located on row: <strong id="import-header-row">1</strong> <span class="font-normal text-blue-600">(Preceding report metadata skipped)</span></div>
+                                <button onclick="app.importController.executeImport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow font-medium">Execute Import & Reconcile</button>
                             </div>
-                            
-                            <div>
-                                <h4 class="font-medium mb-3 text-gray-800">Field Mapping Verification</h4>
-                                <div class="overflow-x-auto border rounded-lg">
-                                    <table class="min-w-full text-sm text-left">
-                                        <thead class="bg-gray-100 text-gray-700">
-                                            <tr>
-                                                <th class="py-2 px-4 border-b">System Field</th>
-                                                <th class="py-2 px-4 border-b">Detected CSV Column</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="import-mapping-table" class="divide-y">
-                                            <!-- Mappings injected here -->
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <div class="overflow-x-auto border rounded-lg">
+                                <table class="min-w-full text-sm text-left">
+                                    <thead class="bg-gray-100 text-gray-700"><tr><th class="py-2 px-4 border-b">System Field</th><th class="py-2 px-4 border-b">Detected CSV Column</th></tr></thead>
+                                    <tbody id="import-mapping-table" class="divide-y"></tbody>
+                                </table>
                             </div>
                         </div>
 
                         <!-- Step 3: Results -->
                         <div id="import-step-3" class="hidden space-y-6">
                             <div class="bg-emerald-50 border border-emerald-200 rounded p-6 text-center">
-                                <svg class="w-12 h-12 text-emerald-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                <h4 class="text-lg font-bold text-emerald-800">Import & Reconciliation Complete</h4>
-                                <p class="text-emerald-700 text-sm mt-1">The workflow executed successfully.</p>
+                                <h4 class="text-lg font-bold text-emerald-800">Import Complete</h4>
                             </div>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold" id="res-imported">0</p><p class="text-xs text-gray-500 uppercase">Imported</p></div>
-                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-amber-600" id="res-dupes">0</p><p class="text-xs text-gray-500 uppercase">Duplicates Merged</p></div>
-                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-blue-600" id="res-new">0</p><p class="text-xs text-gray-500 uppercase">New in Queue</p></div>
-                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-red-600" id="res-missing">0</p><p class="text-xs text-gray-500 uppercase">Missing Assets</p></div>
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold" id="res-imported">0</p><p class="text-xs uppercase">Imported</p></div>
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-amber-600" id="res-dupes">0</p><p class="text-xs uppercase">Duplicates</p></div>
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-blue-600" id="res-new">0</p><p class="text-xs uppercase">New in Queue</p></div>
+                                <div class="bg-gray-50 p-4 rounded border"><p class="text-2xl font-bold text-red-600" id="res-missing">0</p><p class="text-xs uppercase">Missing</p></div>
                             </div>
                             <button onclick="app.switchView('review')" class="w-full bg-slate-800 text-white py-3 rounded hover:bg-slate-700 font-medium">Go to Review Queue</button>
                         </div>
                         
-                        <!-- Secondary Source: Platform Inventory -->
+                        <!-- Platform Inventory Import -->
                         <div class="mt-8 border-t border-gray-200 pt-8">
                             <h3 class="text-lg font-semibold mb-2">Platform Inventory Source</h3>
-                            <p class="text-gray-600 mb-4 text-sm">Upload a CSV or JSON containing known Platform assets to improve automatic ownership resolution. This serves as the secondary source of truth after the Asset Register.</p>
+                            <p class="text-gray-600 mb-4 text-sm">Upload a CSV/JSON of known platform assets to improve automatic ownership resolution.</p>
                             <input type="file" id="inventory-file-input" accept=".csv,.json" class="hidden" onchange="app.importController.handleInventoryFile(event)">
-                            <label for="inventory-file-input" class="inline-block cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 text-sm font-medium transition shadow-sm">
-                                📤 Upload Platform Inventory
-                            </label>
+                            <label for="inventory-file-input" class="cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm font-medium shadow-sm hover:bg-gray-50">📤 Upload Platform Inventory</label>
                             <div id="inventory-import-result" class="text-sm text-emerald-700 font-medium mt-3 hidden bg-emerald-50 p-3 rounded border border-emerald-200"></div>
                         </div>
-
                     </div>
                 </div>
             </section>
 
             <!-- VIEW: REVIEW QUEUE -->
             <section id="view-review" class="view-section h-full flex flex-col">
-                <div class="flex flex-wrap gap-4 mb-4" id="review-analytics">
-                    <!-- Analytics Injected Here -->
-                </div>
+                <div class="flex flex-wrap gap-4 mb-4" id="review-analytics"></div>
                 
-                <div class="bg-white p-4 rounded-lg shadow mb-4 border border-gray-200 flex flex-wrap gap-4 items-end">
-                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">State</label><select id="review-filter-state" onchange="app.updateReviewFilters()" class="border-gray-300 rounded text-sm px-3 py-1.5"><option value="ALL">All States</option><option value="PENDING" selected>Pending</option><option value="IN_REVIEW">In Review</option><option value="ESCALATED">Escalated</option></select></div>
-                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Suggested Owner</label><select id="review-filter-owner" onchange="app.updateReviewFilters()" class="border-gray-300 rounded text-sm px-3 py-1.5"><option value="ALL">All Owners</option><option value="Platform">Platform</option><option value="CORP">CORP</option><option value="NOPS">NOPS</option><option value="Unknown">Unknown</option></select></div>
-                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Service Type</label><select id="review-filter-service" onchange="app.updateReviewFilters()" class="border-gray-300 rounded text-sm px-3 py-1.5"><option value="ALL">All Services</option><option value="Active Directory">Active Directory</option><option value="DNS">DNS</option><option value="Monitoring">Monitoring</option><option value="Database">Database</option><option value="Backup">Backup</option><option value="Unclassified">Unclassified</option></select></div>
-                    <div class="flex-1"><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Search Assets</label><input type="text" id="review-filter-search" oninput="app.updateReviewFilters()" placeholder="Search names, IPs, services..." class="border-gray-300 rounded text-sm px-3 py-1.5 w-full"></div>
+                <div class="bg-white p-4 rounded-lg shadow mb-4 border flex flex-wrap gap-4 items-end">
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">State</label><select id="review-filter-state" onchange="app.updateReviewFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All States</option><option value="PENDING" selected>Pending</option><option value="IN_REVIEW">In Review</option><option value="ESCALATED">Escalated</option></select></div>
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Suggested Owner</label><select id="review-filter-owner" onchange="app.updateReviewFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Owners</option><option value="Platform">Platform</option><option value="CORP">CORP</option><option value="NOPS">NOPS</option><option value="Unknown">Unknown</option></select></div>
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Service Type</label><select id="review-filter-service" onchange="app.updateReviewFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Services</option><option value="Active Directory">Active Directory</option><option value="DNS">DNS</option><option value="Monitoring">Monitoring</option><option value="Database">Database</option><option value="Backup">Backup</option><option value="Unclassified">Unclassified</option></select></div>
+                    <div class="flex-1"><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Search Assets</label><input type="text" id="review-filter-search" oninput="app.updateReviewFilters()" placeholder="Search names, IPs, services..." class="border-gray-300 rounded text-sm w-full"></div>
                 </div>
 
                 <div class="bg-blue-50 border border-blue-200 rounded-t-lg p-3 flex justify-between items-center text-sm">
@@ -178,20 +152,17 @@
                             <input type="checkbox" id="review-select-all-visible" onchange="app.toggleSelectVisibleReviews()" class="rounded border-blue-300 text-blue-600 focus:ring-blue-200">
                             <span>Select Visible</span>
                         </label>
-                        <span class="text-blue-600">|</span>
                         <span class="font-bold text-blue-900"><span id="review-selected-count">0</span> Selected</span>
                         <button onclick="app.clearReviewSelection()" class="text-blue-600 hover:underline text-xs">Clear</button>
                     </div>
                     <div class="space-x-2">
-                        <button onclick="app.promptBulkAction('APPROVE', 'Platform')" class="bg-white border border-blue-300 text-blue-700 px-3 py-1 rounded shadow-sm hover:bg-blue-50 transition font-medium">Bulk Platform</button>
-                        <button onclick="app.promptBulkAction('APPROVE', 'CORP')" class="bg-white border border-blue-300 text-blue-700 px-3 py-1 rounded shadow-sm hover:bg-blue-50 transition font-medium">Bulk CORP</button>
-                        <button onclick="app.promptBulkAction('APPROVE', 'NOPS')" class="bg-white border border-blue-300 text-blue-700 px-3 py-1 rounded shadow-sm hover:bg-blue-50 transition font-medium">Bulk NOPS</button>
-                        <span class="text-blue-300 mx-1">|</span>
-                        <button onclick="app.promptBulkAction('REJECT', null)" class="bg-red-50 border border-red-200 text-red-700 px-3 py-1 rounded shadow-sm hover:bg-red-100 transition font-medium">Bulk Reject</button>
+                        <button onclick="app.promptBulkAction('APPROVE', 'Platform')" class="bg-white border text-blue-700 px-3 py-1 rounded shadow-sm font-medium">Bulk Platform</button>
+                        <button onclick="app.promptBulkAction('APPROVE', 'CORP')" class="bg-white border text-blue-700 px-3 py-1 rounded shadow-sm font-medium">Bulk CORP</button>
+                        <button onclick="app.promptBulkAction('REJECT', null)" class="bg-red-50 border border-red-200 text-red-700 px-3 py-1 rounded shadow-sm font-medium">Bulk Reject</button>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-b-lg shadow flex-1 overflow-hidden flex flex-col border-x border-b border-gray-200">
+                <div class="bg-white rounded-b-lg shadow flex-1 overflow-hidden flex flex-col border-x border-b">
                     <div class="overflow-auto flex-1">
                         <table class="min-w-full text-left text-sm whitespace-nowrap">
                             <thead class="bg-gray-100 text-gray-600 border-b sticky top-0 z-10">
@@ -204,9 +175,7 @@
                                     <th class="px-4 py-3 text-right">Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="review-queue-tbody" class="divide-y">
-                                <!-- Injected by JS -->
-                            </tbody>
+                            <tbody id="review-queue-tbody" class="divide-y"></tbody>
                         </table>
                     </div>
                 </div>
@@ -216,7 +185,7 @@
             <section id="view-register" class="view-section h-full flex flex-col">
                 <div class="flex justify-between items-end mb-4">
                     <h3 class="text-xl font-semibold">Authoritative Register</h3>
-                    <input type="text" id="register-search" placeholder="Search assets..." class="border-gray-300 rounded-md shadow-sm text-sm px-4 py-2 w-64" oninput="app.renderRegister()">
+                    <input type="text" id="register-search" placeholder="Search assets..." class="border-gray-300 rounded text-sm px-4 py-2 w-64" oninput="app.renderRegister()">
                 </div>
                 <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col border border-gray-200">
                     <div class="overflow-auto flex-1">
@@ -232,9 +201,7 @@
                                     <th class="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="register-tbody" class="divide-y">
-                                <!-- Register items go here -->
-                            </tbody>
+                            <tbody id="register-tbody" class="divide-y"></tbody>
                         </table>
                     </div>
                 </div>
@@ -244,52 +211,35 @@
             <section id="view-health" class="view-section">
                  <h3 class="text-xl font-semibold mb-6">Governance Data Health</h3>
                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div class="bg-white shadow rounded-lg p-6 border border-gray-200">
+                     <div class="bg-white shadow rounded-lg p-6 border">
                          <h4 class="font-medium text-red-600 border-b pb-2 mb-3">Missing Ownership</h4>
-                         <ul id="health-missing-owner" class="text-sm space-y-2 text-gray-700 max-h-48 overflow-y-auto"></ul>
+                         <ul id="health-missing-owner" class="text-sm space-y-2 text-gray-700"></ul>
                      </div>
-                     <div class="bg-white shadow rounded-lg p-6 border border-gray-200">
+                     <div class="bg-white shadow rounded-lg p-6 border">
                          <h4 class="font-medium text-amber-600 border-b pb-2 mb-3">Unclassified Services</h4>
-                         <ul id="health-missing-service" class="text-sm space-y-2 text-gray-700 max-h-48 overflow-y-auto"></ul>
+                         <ul id="health-missing-service" class="text-sm space-y-2 text-gray-700"></ul>
                      </div>
                  </div>
             </section>
 
             <!-- VIEW: REPORTS -->
             <section id="view-reports" class="view-section">
-                <div class="bg-white rounded-lg shadow p-8 max-w-4xl mx-auto border border-gray-200">
+                <div class="bg-white rounded-lg shadow p-8 max-w-4xl mx-auto border">
                     <div class="flex justify-between items-center mb-8 border-b pb-4">
                         <div>
                             <h2 class="text-2xl font-bold">Executive Governance Report</h2>
                             <p class="text-gray-500 text-sm mt-1" id="report-date"></p>
                         </div>
-                        <button onclick="window.print()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded text-sm font-medium transition">🖨️ Print PDF</button>
+                        <button onclick="window.print()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded text-sm font-medium">🖨️ Print PDF</button>
                     </div>
-                    
-                    <div class="space-y-8">
-                        <div>
-                            <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">1. Estate Summary</h3>
-                            <div class="grid grid-cols-3 gap-4 text-center">
-                                <div class="p-4 bg-slate-50 rounded border border-gray-100"><p class="text-2xl font-bold text-slate-700" id="rpt-total">0</p><p class="text-xs uppercase text-slate-500 mt-1">Total Governed Assets</p></div>
-                                <div class="p-4 bg-blue-50 rounded border border-blue-100"><p class="text-2xl font-bold text-blue-700" id="rpt-platform">0</p><p class="text-xs uppercase text-blue-500 mt-1">Platform Owned</p></div>
-                                <div class="p-4 bg-gray-50 rounded border border-gray-100"><p class="text-2xl font-bold text-gray-700" id="rpt-other">0</p><p class="text-xs uppercase text-gray-500 mt-1">Other (Corp/Nops)</p></div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">2. Operations & Triage</h3>
-                            <ul class="list-disc pl-5 space-y-2 text-sm text-gray-700">
-                                <li><strong id="rpt-queue">0</strong> assets currently sitting in the triage queue awaiting classification.</li>
-                                <li><strong id="rpt-health">100%</strong> data health integrity score across the current estate.</li>
-                            </ul>
-                        </div>
-                        
-                        <div>
-                            <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">3. Ownership Sources (Platform Assets)</h3>
-                            <ul class="list-disc pl-5 space-y-2 text-sm text-gray-700" id="rpt-ownership-sources">
-                                <!-- Injected by JS -->
-                            </ul>
-                        </div>
+                    <div class="grid grid-cols-3 gap-4 text-center mb-8">
+                        <div class="p-4 bg-slate-50 rounded border"><p class="text-2xl font-bold text-slate-700" id="rpt-total">0</p><p class="text-xs uppercase text-slate-500">Total Assets</p></div>
+                        <div class="p-4 bg-blue-50 rounded border border-blue-100"><p class="text-2xl font-bold text-blue-700" id="rpt-platform">0</p><p class="text-xs uppercase text-blue-500">Platform Owned</p></div>
+                        <div class="p-4 bg-gray-50 rounded border"><p class="text-2xl font-bold text-gray-700" id="rpt-other">0</p><p class="text-xs uppercase text-gray-500">Other</p></div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">Ownership Sources (Platform)</h3>
+                        <ul class="list-disc pl-5 space-y-2 text-sm text-gray-700" id="rpt-ownership-sources"></ul>
                     </div>
                 </div>
             </section>
@@ -299,158 +249,101 @@
                 <div class="flex justify-between items-center mb-4">
                     <div>
                         <h3 class="text-xl font-semibold">Vulnerability Management</h3>
-                        <p class="text-sm text-gray-500 mt-1">Import Qualys Vulnerability exports and prioritize by Asset exposure.</p>
+                        <p class="text-sm text-gray-500">Import Qualys Vulnerability CSV to prioritize by Asset exposure.</p>
                     </div>
                     <div>
                         <input type="file" id="vuln-file-input" accept=".csv" class="hidden" onchange="app.importVulnData(event)">
-                        <label for="vuln-file-input" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 shadow-sm font-medium cursor-pointer flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                            Import Vuln CSV
-                        </label>
+                        <label for="vuln-file-input" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 shadow-sm font-medium cursor-pointer">Import Vuln CSV</label>
                     </div>
                 </div>
-                <!-- Standard placeholders... -->
+                <div id="vuln-import-result" class="hidden"></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center" id="vuln-summary-metrics"></div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                    <div class="bg-white rounded shadow overflow-hidden border">
+                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top 10 High-Risk Assets</h4>
+                        <table class="min-w-full text-sm text-left"><tbody id="vuln-top-assets" class="divide-y"></tbody></table>
+                    </div>
+                    <div class="bg-white rounded shadow overflow-hidden border">
+                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top 10 CVEs (Weighted Impact)</h4>
+                        <table class="min-w-full text-sm text-left"><tbody id="vuln-top-cves" class="divide-y"></tbody></table>
+                    </div>
+                </div>
             </section>
         </div>
 
-        <!-- Bulk Action Confirmation Modal -->
+        <!-- Modals -->
         <div id="modal-bulk-confirm" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
             <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-center">
-                <h3 class="text-xl font-bold text-gray-900 mb-2">Confirm Bulk Classification</h3>
-                <p class="text-gray-600 text-sm mb-4">You are about to classify <strong id="bulk-confirm-count" class="text-gray-900 text-lg">0</strong> assets.</p>
+                <h3 class="text-xl font-bold mb-2">Confirm Bulk Classification</h3>
+                <p class="text-sm mb-4">Classifying <strong id="bulk-confirm-count" class="text-lg">0</strong> assets.</p>
                 <div class="bg-gray-50 border rounded p-4 text-left text-sm mb-6 space-y-2">
-                    <p><span class="font-semibold text-gray-500 w-24 inline-block">Action:</span> <span id="bulk-confirm-action" class="font-bold text-gray-900"></span></p>
+                    <p><span class="font-semibold text-gray-500 w-24 inline-block">Action:</span> <span id="bulk-confirm-action" class="font-bold"></span></p>
                     <p id="bulk-confirm-owner-wrap"><span class="font-semibold text-gray-500 w-24 inline-block">Owner:</span> <span id="bulk-confirm-owner" class="font-bold text-blue-600"></span></p>
-                    <p><span class="font-semibold text-gray-500 w-24 inline-block">Service Types:</span> <span id="bulk-confirm-services" class="text-gray-700 italic"></span></p>
                 </div>
                 <div class="flex justify-center space-x-3">
-                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
-                    <button onclick="app.executeBulkAction()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium text-sm shadow transition">Confirm Action</button>
+                    <button onclick="app.closeModals()" class="px-4 py-2 border rounded">Cancel</button>
+                    <button onclick="app.executeBulkAction()" class="px-4 py-2 bg-blue-600 text-white rounded">Confirm</button>
                 </div>
             </div>
         </div>
 
         <div id="modal-bulk-report" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
             <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
-                <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-emerald-100 mb-4">
-                    <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                <h3 class="text-xl font-bold mb-2">Success</h3>
+                <div class="grid grid-cols-2 gap-4 text-left border-t border-b py-4 bg-gray-50 rounded px-4 my-4">
+                    <div><p class="text-xs uppercase font-semibold">Processed</p><p class="text-2xl font-bold" id="bulk-rep-processed">0</p></div>
+                    <div><p class="text-xs uppercase font-semibold">Queue Remaining</p><p class="text-2xl font-bold text-blue-600" id="bulk-rep-remaining">0</p></div>
                 </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-2">Success</h3>
-                <p class="text-gray-500 text-sm mb-6">Bulk triage operation completed.</p>
-                <div class="grid grid-cols-2 gap-4 text-left border-t border-b py-4 bg-gray-50 rounded px-4">
-                    <div><p class="text-xs text-gray-500 uppercase font-semibold">Processed</p><p class="text-2xl font-bold text-gray-800" id="bulk-rep-processed">0</p></div>
-                    <div><p class="text-xs text-gray-500 uppercase font-semibold">Queue Remaining</p><p class="text-2xl font-bold text-blue-600" id="bulk-rep-remaining">0</p></div>
-                </div>
-                <div class="mt-6">
-                    <button onclick="app.closeModals()" class="w-full px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 font-medium text-sm transition shadow">Continue Triage</button>
-                </div>
+                <button onclick="app.closeModals()" class="w-full px-4 py-2 bg-slate-800 text-white rounded">Continue Triage</button>
             </div>
         </div>
 
         <div id="modal-reset-confirm" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 z-50 flex items-center justify-center backdrop-blur-sm">
             <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-center">
-                <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-red-100 mb-4">
-                    <svg class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-2">Reset Database</h3>
-                <p class="text-gray-500 text-sm mb-6">Are you sure you want to completely erase all governance data, queues, and registers? This cannot be undone.</p>
+                <h3 class="text-xl font-bold mb-2">Reset Database</h3>
+                <p class="text-gray-500 text-sm mb-6">Erase all governance data?</p>
                 <div class="flex justify-center space-x-3">
-                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
-                    <button onclick="app.executeReset()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium text-sm shadow transition">Erase Everything</button>
+                    <button onclick="app.closeModals()" class="px-4 py-2 border rounded">Cancel</button>
+                    <button onclick="app.executeReset()" class="px-4 py-2 bg-red-600 text-white rounded">Erase Everything</button>
                 </div>
             </div>
         </div>
 
         <div id="modal-edit-asset" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden">
-                <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
-                    <h3 class="text-lg font-bold text-gray-900">Edit Asset Record</h3>
-                    <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden p-6 space-y-4 text-sm">
+                <h3 class="text-lg font-bold">Edit Asset Record</h3>
+                <div class="bg-gray-100 p-2 rounded font-mono font-semibold" id="edit-asset-name"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block font-medium mb-1">Owner</label><select id="edit-asset-owner" class="w-full border rounded p-2"><option value="Platform">Platform</option><option value="CORP">CORP</option><option value="NOPS">NOPS</option><option value="Unknown">Unknown</option></select></div>
+                    <div><label class="block font-medium mb-1">Status</label><select id="edit-asset-status" class="w-full border rounded p-2"><option value="Approved">Approved</option><option value="Retired">Retired</option><option value="Pending">Pending Review</option></select></div>
+                    <div><label class="block font-medium mb-1">Environment</label><select id="edit-asset-env" class="w-full border rounded p-2"><option value="Prod">Production</option><option value="Non-Prod">Non-Prod / Dev</option><option value="DR">Disaster Recovery</option></select></div>
+                    <div><label class="block font-medium mb-1">Service Type</label><input type="text" id="edit-asset-service" class="w-full border rounded p-2"></div>
+                    <div><label class="block font-medium mb-1">Exposure</label><select id="edit-asset-exposure" class="w-full border rounded p-2"><option value="Internal">Internal</option><option value="DMZ">DMZ</option><option value="Internet Facing">Internet Facing</option><option value="Unknown">Unknown</option></select></div>
+                    <div><label class="block font-medium mb-1">Criticality</label><select id="edit-asset-criticality" class="w-full border rounded p-2"><option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option><option value="Mission Critical">Mission Critical</option></select></div>
                 </div>
-                <div class="p-6 space-y-4 text-sm">
-                    <div>
-                        <label class="block font-medium text-gray-700 mb-1">Asset Identity</label>
-                        <div class="bg-gray-100 p-2 rounded text-gray-800 font-mono font-semibold" id="edit-asset-name"></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block font-medium text-gray-700 mb-1">Owner</label>
-                            <select id="edit-asset-owner" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
-                                <option value="Platform">Platform</option>
-                                <option value="CORP">CORP</option>
-                                <option value="NOPS">NOPS</option>
-                                <option value="Unknown">Unknown</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block font-medium text-gray-700 mb-1">Status</label>
-                            <select id="edit-asset-status" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
-                                <option value="Approved">Approved</option>
-                                <option value="Retired">Retired</option>
-                                <option value="Pending">Pending Review</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block font-medium text-gray-700 mb-1">Environment</label>
-                            <select id="edit-asset-env" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
-                                <option value="Prod">Production</option>
-                                <option value="Non-Prod">Non-Prod / Dev</option>
-                                <option value="DR">Disaster Recovery</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block font-medium text-gray-700 mb-1">Service Type</label>
-                            <input type="text" id="edit-asset-service" class="w-full border-gray-300 rounded shadow-sm py-1.5 px-3 focus:ring-blue-500 focus:border-blue-500 border">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4 mt-2">
-                        <div>
-                            <label class="block font-medium text-gray-700 mb-1">Exposure</label>
-                            <select id="edit-asset-exposure" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
-                                <option value="Internal">Internal</option>
-                                <option value="DMZ">DMZ</option>
-                                <option value="Internet Facing">Internet Facing</option>
-                                <option value="Unknown">Unknown</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block font-medium text-gray-700 mb-1">Service Criticality</label>
-                            <select id="edit-asset-criticality" class="w-full border-gray-300 rounded shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 border">
-                                <option value="Low">Low</option>
-                                <option value="Medium">Medium</option>
-                                <option value="High">High</option>
-                                <option value="Mission Critical">Mission Critical</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3">
-                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 font-medium transition">Cancel</button>
-                    <button onclick="app.saveAssetEdit()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium shadow transition">Save Changes</button>
+                <div class="flex justify-end space-x-3 mt-4 pt-4 border-t">
+                    <button onclick="app.closeModals()" class="px-4 py-2 border rounded">Cancel</button>
+                    <button onclick="app.saveAssetEdit()" class="px-4 py-2 bg-blue-600 text-white rounded">Save Changes</button>
                 </div>
             </div>
         </div>
 
         <div id="modal-delete-confirm" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
             <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-center">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900 mb-2">Delete Asset Record</h3>
-                <p class="text-gray-600 text-sm mb-4">Are you sure you want to permanently delete <strong id="delete-confirm-name" class="text-gray-900"></strong> from the authoritative register?</p>
-                <p class="text-amber-600 text-xs mb-6 bg-amber-50 p-2 rounded border border-amber-200">Note: If this asset appears in future Qualys scans, it will be added back into the Review Queue.</p>
+                <h3 class="text-lg font-bold mb-2">Delete Asset</h3>
+                <p class="text-sm mb-4">Permanently delete <strong id="delete-confirm-name"></strong>?</p>
                 <div class="flex justify-center space-x-3">
-                    <button onclick="app.closeModals()" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium text-sm transition">Cancel</button>
-                    <button onclick="app.executeDeleteAsset()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium text-sm shadow transition">Delete Asset</button>
+                    <button onclick="app.closeModals()" class="px-4 py-2 border rounded">Cancel</button>
+                    <button onclick="app.executeDeleteAsset()" class="px-4 py-2 bg-red-600 text-white rounded">Delete Asset</button>
                 </div>
             </div>
         </div>
-
     </main>
 
     <script>
         // ==========================================
-        // CORE ARCHITECTURE & SERVICES
+        // SINGLE INSTANCE CLASSES
         // ==========================================
 
         class StorageService {
@@ -458,7 +351,6 @@
                 ASSET_REGISTER: 'gov_asset_register',
                 REVIEW_QUEUE: 'gov_review_queue',
                 OWNERSHIP_LEDGER: 'gov_ownership_ledger',
-                RECONCILIATION_RUNS: 'gov_recon_runs',
                 PLATFORM_INVENTORY: 'gov_platform_inventory',
                 VULNERABILITY_REGISTER: 'gov_vuln_register'
             };
@@ -477,11 +369,10 @@
                     assetRegister: this.load(this.KEYS.ASSET_REGISTER),
                     reviewQueue: this.load(this.KEYS.REVIEW_QUEUE),
                     ownershipLedger: this.load(this.KEYS.OWNERSHIP_LEDGER),
-                    reconciliationRuns: this.load(this.KEYS.RECONCILIATION_RUNS),
                     platformInventory: this.load(this.KEYS.PLATFORM_INVENTORY),
                     vulnerabilityRegister: this.load(this.KEYS.VULNERABILITY_REGISTER),
                     exportDate: new Date().toISOString(),
-                    version: '2.1'
+                    version: '2.2'
                 };
                 const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -501,9 +392,7 @@
                 if (!name) return 'unknown-asset';
                 let n = String(name).toLowerCase().trim();
                 const domains = ['.piiplat.net', '.peiplat.net', '.back.peiplat.net', '.local'];
-                domains.forEach(d => {
-                    if (n.endsWith(d)) n = n.slice(0, -d.length);
-                });
+                domains.forEach(d => { if (n.endsWith(d)) n = n.slice(0, -d.length); });
                 return n.replace(/\.+$/, '').replace(/\s+/g, '-');
             }
 
@@ -518,7 +407,7 @@
                     case 'Internet Facing': return 2.0;
                     case 'DMZ': return 1.5;
                     case 'Internal': return 1.0;
-                    default: return 1.0; // Unknown defaults to 1.0 multiplier
+                    default: return 1.0;
                 }
             }
 
@@ -531,7 +420,6 @@
             static infer(name, tags = '') {
                 const n = String(name).toLowerCase();
                 const t = String(tags).toLowerCase();
-                
                 if (n.includes('dc-') || n.includes('adds')) return 'Active Directory';
                 if (n.includes('dns')) return 'DNS';
                 if (n.includes('dhcp')) return 'DHCP';
@@ -539,7 +427,6 @@
                 if (n.includes('sql') || n.includes('db') || n.includes('zdb')) return 'Database';
                 if (n.includes('zbx') || n.includes('graf') || t.includes('monitoring')) return 'Monitoring';
                 if (n.includes('veeam') || n.includes('backv')) return 'Backup';
-                
                 return 'Unclassified';
             }
         }
@@ -550,7 +437,7 @@
                 hostId: /^host.?id$/i,
                 hardwareUuid: /^(hardware.?uuid|uuid)$/i,
                 assetName: /^(asset.?name|hostname|dns.?hostname)$/i,
-                ipv4Address: /^(ip|ipv4|(ip|ipv4).?address(es)?)$/i,
+                ipv4Address: /^(ipv4|ip|ipv4.?address(es)?|ip.?address(es)?)$/i,
                 ipv6Address: /^(ipv6|ipv6.?address(es)?)$/i,
                 operatingSystem: /^(os|operating.?system)$/i,
                 osCategory: /^(os|operating.?system).?category$/i,
@@ -565,9 +452,7 @@
                 const map = {};
                 headers.forEach((h, index) => {
                     for (const [sysKey, regex] of Object.entries(this.FIELD_MAPPINGS)) {
-                        if (!map[sysKey] && regex.test(h.trim())) {
-                            map[sysKey] = index;
-                        }
+                        if (!map[sysKey] && regex.test(h.trim())) map[sysKey] = index;
                     }
                 });
                 return map;
@@ -595,7 +480,6 @@
                         ownershipSource: asset.ownershipSource || 'Unknown',
                         status: this.STATES.PENDING,
                         reason: reason,
-                        addedDate: new Date().toISOString(),
                         qualysData: asset
                     });
                     StorageService.save(StorageService.KEYS.REVIEW_QUEUE, queue);
@@ -617,15 +501,10 @@
                     if (itemIdx === -1) return;
 
                     const item = queue[itemIdx];
-                    item.status = decisionStatus;
-                    item.resolvedDate = new Date().toISOString();
-                    
                     queue.splice(itemIdx, 1);
 
                     if (decisionStatus === this.STATES.APPROVED) {
                         const qData = item.qualysData || {};
-                        const primaryId = qData.assetId || qData.hostId || qData.hardwareUuid || item.normalizedName;
-                        
                         let existingIdx = register.findIndex(r => r.normalizedName === item.normalizedName);
                         if (existingIdx === -1 && qData.assetId) existingIdx = register.findIndex(r => r.assetId === qData.assetId);
 
@@ -643,7 +522,6 @@
                             osVersion: qData.osVersion || '',
                             tags: qData.tags || '',
                             metadata: qData.metadata || {},
-                            
                             owner: finalOwner,
                             ownershipSource: item.ownershipSource,
                             service: finalService,
@@ -651,32 +529,24 @@
                             environment: 'Production',
                             exposure: 'Unknown',
                             criticality: 'Medium',
-                            
                             baseRiskScore: baseRisk,
                             exposureMultiplier: RiskScoringEngine.getMultiplier('Unknown'),
                             effectiveRiskScore: RiskScoringEngine.calculateEffectiveRisk(baseRisk, 'Unknown'),
-                            
-                            decisionDate: new Date().toISOString(),
                             lastSeen: new Date().toISOString()
                         };
 
                         if (existingIdx >= 0) {
                             const current = register[existingIdx];
                             register[existingIdx] = { 
-                                ...current, 
-                                ...newRecord, 
-                                owner: finalOwner, 
-                                service: finalService,
-                                exposure: current.exposure || 'Unknown',
-                                environment: current.environment || 'Production',
-                                status: current.status || 'Approved'
+                                ...current, ...newRecord, 
+                                owner: finalOwner, service: finalService,
+                                exposure: current.exposure || 'Unknown', status: current.status || 'Approved'
                             };
                             register[existingIdx].effectiveRiskScore = RiskScoringEngine.calculateEffectiveRisk(newRecord.baseRiskScore, register[existingIdx].exposure);
                         }
                         else register.push(newRecord);
                     }
                 });
-
                 StorageService.save(StorageService.KEYS.REVIEW_QUEUE, queue);
                 StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
             }
@@ -685,79 +555,38 @@
         class ReconciliationEngine {
             static run(importedAssets) {
                 const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                
-                const regByAssetId = new Map();
-                const regByHostId = new Map();
-                const regByUuid = new Map();
-                const regByName = new Map();
-
-                register.forEach(r => {
-                    if (r.assetId) regByAssetId.set(r.assetId, r);
-                    if (r.hostId) regByHostId.set(r.hostId, r);
-                    if (r.hardwareUuid) regByUuid.set(r.hardwareUuid, r);
-                    if (r.normalizedName) regByName.set(r.normalizedName, r);
-                });
-
                 const platformInventory = StorageService.load(StorageService.KEYS.PLATFORM_INVENTORY);
                 const platformKeys = new Set(platformInventory);
                 
-                let newCount = 0;
-                let dedupeCount = 0;
-                let totalProcessed = 0;
-
+                const getReg = (a) => register.find(r => (r.assetId && r.assetId === a.assetId) || r.normalizedName === a.normalizedName);
+                let newCount = 0, dedupeCount = 0, totalProcessed = 0;
                 const uniqueAssets = new Map();
 
                 importedAssets.forEach(a => {
-                    const primaryId = AssetIdentityService.getPrimaryId(a);
-                    if (uniqueAssets.has(primaryId)) {
-                        dedupeCount++;
-                    } else {
-                        uniqueAssets.set(primaryId, a);
-                    }
+                    const pid = AssetIdentityService.getPrimaryId(a);
+                    if (uniqueAssets.has(pid)) dedupeCount++;
+                    else uniqueAssets.set(pid, a);
                 });
 
                 uniqueAssets.forEach(asset => {
                     totalProcessed++;
-                    
-                    let regItem = null;
-                    if (asset.assetId && regByAssetId.has(asset.assetId)) regItem = regByAssetId.get(asset.assetId);
-                    else if (asset.hostId && regByHostId.has(asset.hostId)) regItem = regByHostId.get(asset.hostId);
-                    else if (asset.hardwareUuid && regByUuid.has(asset.hardwareUuid)) regItem = regByUuid.get(asset.hardwareUuid);
-                    else if (asset.normalizedName && regByName.has(asset.normalizedName)) regItem = regByName.get(asset.normalizedName);
-
+                    const regItem = getReg(asset);
                     if (!regItem) {
-                        let suggestedOwner = 'Unknown';
-                        let ownershipSource = 'Unknown';
-                        
+                        let suggestedOwner = 'Unknown', ownershipSource = 'Unknown';
                         if (platformKeys.has(asset.normalizedName) || (asset.assetId && platformKeys.has(asset.assetId))) {
-                            suggestedOwner = 'Platform';
-                            ownershipSource = 'Platform Inventory';
+                            suggestedOwner = 'Platform'; ownershipSource = 'Platform Inventory';
                         } else {
-                            const isPlatformService = ['Monitoring', 'Backup', 'Database'].includes(asset.inferredService);
-                            if (isPlatformService) {
-                                suggestedOwner = 'Platform';
-                                ownershipSource = 'Naming Convention';
-                            }
-                            else if (asset.inferredService === 'Active Directory') {
-                                suggestedOwner = 'CORP';
-                                ownershipSource = 'Naming Convention';
-                            }
+                            if (['Monitoring', 'Backup', 'Database'].includes(asset.inferredService)) { suggestedOwner = 'Platform'; ownershipSource = 'Naming Convention'; }
+                            else if (asset.inferredService === 'Active Directory') { suggestedOwner = 'CORP'; ownershipSource = 'Naming Convention'; }
                         }
                         asset.suggestedOwner = suggestedOwner;
                         asset.ownershipSource = ownershipSource;
-
-                        const added = ReviewQueueService.enqueue(asset, "Newly discovered in Qualys");
-                        if (added) newCount++;
+                        if (ReviewQueueService.enqueue(asset, "New Discovery")) newCount++;
                     } else {
                         regItem.lastSeen = new Date().toISOString();
-                        if (asset.assetId && !regItem.assetId) regItem.assetId = asset.assetId;
-                        if (asset.hostId && !regItem.hostId) regItem.hostId = asset.hostId;
-                        if (asset.hardwareUuid && !regItem.hardwareUuid) regItem.hardwareUuid = asset.hardwareUuid;
                     }
                 });
-
                 StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
-
                 return { totalProcessed, dedupeCount, newCount, missingCount: 0 };
             }
         }
@@ -774,189 +603,112 @@
                 if (!file) return;
 
                 Papa.parse(file, {
-                    header: false,
-                    skipEmptyLines: true,
+                    header: false, skipEmptyLines: true,
                     complete: (results) => {
                         const rawData = results.data;
-                        let headerRowIndex = -1;
-                        let headers = [];
+                        let headerRowIndex = -1, headers = [];
 
                         for (let i = 0; i < Math.min(20, rawData.length); i++) {
-                            const row = rawData[i];
-                            const isHeader = row.some(cell => /^(asset.?name|hostname|dns.?hostname)$/i.test(String(cell).trim()));
-                            if (isHeader) {
+                            if (rawData[i].some(c => /^(asset.?name|hostname|dns.?hostname)$/i.test(String(c).trim()))) {
                                 headerRowIndex = i;
                                 const seen = {};
-                                headers = row.map(h => {
-                                    let cleanH = String(h).trim();
-                                    if (seen[cleanH]) {
-                                        let count = 1;
-                                        while (seen[`${cleanH}_${count}`]) count++;
-                                        cleanH = `${cleanH}_${count}`;
-                                    }
-                                    seen[cleanH] = true;
-                                    return cleanH;
+                                headers = rawData[i].map(h => {
+                                    let cl = String(h).trim();
+                                    if (seen[cl]) cl = cl + '_dup';
+                                    seen[cl] = true; return cl;
                                 });
                                 break;
                             }
                         }
 
-                        if (headerRowIndex === -1) {
-                            alert("CRITICAL: Could not detect a valid header row containing 'Asset Name' within the first 20 lines of the CSV.");
-                            return;
-                        }
+                        if (headerRowIndex === -1) return alert("CRITICAL: Header row with 'Asset Name' not found.");
 
                         this.parsedData = [];
                         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
-                            const rowArray = rawData[i];
                             const rowObj = {};
-                            headers.forEach((header, index) => {
-                                rowObj[header] = rowArray[index];
-                            });
+                            headers.forEach((h, idx) => rowObj[h] = rawData[i][idx]);
                             this.parsedData.push(rowObj);
                         }
 
                         this.mappedHeaders = QualysImportDefinition.detectMapping(headers);
-                        this.renderMappingStep(headers, headerRowIndex + 1);
-                    },
-                    error: (err) => alert("Error parsing CSV: " + err.message)
-                });
-            }
-
-            renderMappingStep(headers, headerRowNum) {
-                document.getElementById('import-step-1').classList.add('hidden');
-                document.getElementById('import-step-2').classList.remove('hidden');
-                document.getElementById('import-rows-detected').textContent = this.parsedData.length;
-                if (headerRowNum) document.getElementById('import-header-row').textContent = headerRowNum;
-                
-                const tbody = document.getElementById('import-mapping-table');
-                tbody.innerHTML = '';
-
-                Object.keys(QualysImportDefinition.FIELD_MAPPINGS).forEach(sysKey => {
-                    const mappedIndex = this.mappedHeaders[sysKey];
-                    const csvHeader = mappedIndex !== undefined ? headers[mappedIndex] : '<span class="text-red-500">Not Found</span>';
-                    
-                    const row = `<tr>
-                        <td class="py-2 px-4 border-b font-mono text-xs">${sysKey}</td>
-                        <td class="py-2 px-4 border-b font-mono text-xs bg-gray-50">${csvHeader}</td>
-                    </tr>`;
-                    tbody.innerHTML += row;
+                        
+                        document.getElementById('import-step-1').classList.add('hidden');
+                        document.getElementById('import-step-2').classList.remove('hidden');
+                        document.getElementById('import-rows-detected').textContent = this.parsedData.length;
+                        document.getElementById('import-header-row').textContent = headerRowIndex + 1;
+                        
+                        const tbody = document.getElementById('import-mapping-table');
+                        tbody.innerHTML = '';
+                        Object.keys(QualysImportDefinition.FIELD_MAPPINGS).forEach(sysKey => {
+                            const mIdx = this.mappedHeaders[sysKey];
+                            tbody.innerHTML += `<tr><td class="py-2 px-4 border-b text-xs font-mono">${sysKey}</td><td class="py-2 px-4 border-b text-xs">${mIdx !== undefined ? headers[mIdx] : '<span class="text-red-500">Not Found</span>'}</td></tr>`;
+                        });
+                    }
                 });
             }
 
             executeImport() {
-                if (this.mappedHeaders.assetName === undefined) {
-                    alert("CRITICAL: Cannot import without an Asset Name mapping.");
-                    return;
-                }
-
+                if (this.mappedHeaders.assetName === undefined) return alert("Asset Name mapping required.");
+                
                 const transformed = this.parsedData.map(row => {
                     const keys = Object.keys(row);
-                    const mappedValues = Object.values(this.mappedHeaders);
-                    const metadata = {};
-                    
-                    keys.forEach((key, index) => {
-                        if (!mappedValues.includes(index)) {
-                            metadata[key] = row[key];
-                        }
-                    });
-
                     const safeGet = (sysKey) => this.mappedHeaders[sysKey] !== undefined ? row[keys[this.mappedHeaders[sysKey]]] : undefined;
-
                     const rawName = safeGet('assetName') || '';
                     const rawTags = safeGet('tags') || '';
                     
                     return {
                         assetId: safeGet('assetId') || null,
-                        hostId: safeGet('hostId') || null,
-                        hardwareUuid: safeGet('hardwareUuid') || null,
-                        
                         originalAssetName: rawName,
                         normalizedName: AssetIdentityService.normalize(rawName),
-                        
                         ipv4Address: safeGet('ipv4Address') || '',
-                        ipv6Address: safeGet('ipv6Address') || '',
-                        
                         os: safeGet('operatingSystem') || '',
                         osCategory: safeGet('osCategory') || '',
                         osVersion: safeGet('osVersion') || '',
-                        
                         tags: rawTags,
-                        activity: safeGet('activity') || '',
-                        
                         inferredService: ServiceClassificationEngine.infer(rawName, rawTags),
-                        
                         truRiskScore: parseFloat(safeGet('truRiskScore')) || 0,
-                        criticalityScore: parseFloat(safeGet('criticalityScore')) || 0,
-                        
-                        metadata: metadata
                     };
-                }).filter(a => a.normalizedName !== 'unknown-asset' && a.normalizedName !== '');
+                }).filter(a => a.normalizedName !== 'unknown-asset');
 
                 const results = ReconciliationEngine.run(transformed);
-
                 document.getElementById('import-step-2').classList.add('hidden');
                 document.getElementById('import-step-3').classList.remove('hidden');
-                
                 document.getElementById('res-imported').textContent = results.totalProcessed;
                 document.getElementById('res-dupes').textContent = results.dedupeCount;
                 document.getElementById('res-new').textContent = results.newCount;
-                document.getElementById('res-missing').textContent = results.missingCount;
-
                 this.app.updateGlobalBadges();
             }
 
             handleInventoryFile(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const content = e.target.result;
                     let names = [];
-                    
                     if (file.name.endsWith('.json')) {
-                        try {
-                            const data = JSON.parse(content);
-                            names = data.map(item => typeof item === 'string' ? item : (item.assetName || item.name || ''));
-                        } catch(err) { alert("Invalid JSON file."); return; }
+                        try { names = JSON.parse(content).map(i => typeof i === 'string' ? i : (i.name || i.assetName)); } catch(err) { return alert("Invalid JSON"); }
                     } else {
-                        const results = Papa.parse(content, { header: true, skipEmptyLines: true });
-                        if (results.data.length > 0) {
-                            const keys = Object.keys(results.data[0]);
-                            const nameKey = keys.find(k => /name|host/i.test(k)) || keys[0];
-                            names = results.data.map(row => row[nameKey]);
+                        const res = Papa.parse(content, { header: true, skipEmptyLines: true });
+                        if (res.data.length > 0) {
+                            const nameKey = Object.keys(res.data[0]).find(k => /name|host/i.test(k)) || Object.keys(res.data[0])[0];
+                            names = res.data.map(r => r[nameKey]);
                         }
                     }
-                    
-                    const normalizedNames = names.map(n => AssetIdentityService.normalize(n)).filter(n => n !== 'unknown-asset' && n !== '');
-                    StorageService.save(StorageService.KEYS.PLATFORM_INVENTORY, normalizedNames);
-                    
-                    const resDiv = document.getElementById('inventory-import-result');
-                    resDiv.innerHTML = `✅ Successfully imported and synchronized <strong>${normalizedNames.length}</strong> platform assets to the secondary discovery list.`;
-                    resDiv.classList.remove('hidden');
+                    const norm = names.map(n => AssetIdentityService.normalize(n)).filter(n => n !== 'unknown-asset');
+                    StorageService.save(StorageService.KEYS.PLATFORM_INVENTORY, norm);
+                    document.getElementById('inventory-import-result').innerHTML = `✅ Synced ${norm.length} platform assets.`;
+                    document.getElementById('inventory-import-result').classList.remove('hidden');
                 };
                 reader.readAsText(file);
             }
         }
 
-        // ==========================================
-        // MAIN APP CONTROLLER - SINGLE INSTANCE
-        // ==========================================
-
         class App {
             constructor() {
                 this.importController = new ImportController(this);
-                this.reviewState = {
-                    filters: { state: 'PENDING', owner: 'ALL', service: 'ALL', search: '' },
-                    selectedIds: new Set(),
-                    visibleIds: [],
-                    pendingAction: null
-                };
-                this.registerState = {
-                    editingAsset: null,
-                    deletingAsset: null
-                };
+                this.reviewState = { filters: { state: 'PENDING', owner: 'ALL', service: 'ALL', search: '' }, selectedIds: new Set(), visibleIds: [], pendingAction: null };
+                this.registerState = { editingAsset: null, deletingAsset: null };
             }
 
             init() {
@@ -966,570 +718,227 @@
             }
 
             switchView(viewId) {
-                console.log(`Switching to view: ${viewId}`); // DIAGNOSTIC ADDED
-
                 document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
                 document.getElementById('view-' + viewId).classList.add('active');
-                
-                const titles = {
-                    'dashboard': 'Executive Dashboard',
-                    'import': 'Data Ingestion',
-                    'review': 'Triage & Review Queue',
-                    'register': 'Authoritative Asset Register',
-                    'vuln': 'Vulnerability Management',
-                    'health': 'Data Integrity & Health',
-                    'reports': 'Governance Reports'
-                };
-                document.getElementById('page-title').textContent = titles[viewId];
-
-                // Execute the corresponding renderer automatically based on the view target
                 if (viewId === 'dashboard') this.renderDashboard();
                 if (viewId === 'review') this.renderReviewQueue();
                 if (viewId === 'register') this.renderRegister();
-                if (viewId === 'vuln') this.renderVulnDashboard();
                 if (viewId === 'health') this.renderHealth();
                 if (viewId === 'reports') this.renderReports();
+                if (viewId === 'vuln') this.renderVulnDashboard();
             }
 
             updateGlobalBadges() {
                 const q = ReviewQueueService.getQueue().filter(x => x.status === 'PENDING' || x.status === 'IN_REVIEW');
                 const b = document.getElementById('nav-review-badge');
-                if (q.length > 0) {
-                    b.textContent = q.length;
-                    b.classList.remove('hidden');
-                } else {
-                    b.classList.add('hidden');
-                }
+                if (q.length > 0) { b.textContent = q.length; b.classList.remove('hidden'); } 
+                else b.classList.add('hidden');
             }
 
             renderDashboard() {
                 const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 const queue = ReviewQueueService.getQueue().filter(x => x.status === 'PENDING' || x.status === 'IN_REVIEW');
-                
                 document.getElementById('kpi-total-assets').textContent = register.length;
                 document.getElementById('kpi-platform-assets').textContent = register.filter(r => r.owner === 'Platform').length;
                 document.getElementById('kpi-pending-review').textContent = queue.length;
-                
-                const missingOwner = register.filter(r => !r.owner || r.owner === 'Unknown').length;
-                document.getElementById('kpi-health-score').textContent = missingOwner === 0 ? '100%' : Math.round(((register.length - missingOwner) / register.length) * 100) + '%';
-
-                const actionsList = document.getElementById('dashboard-actions');
-                actionsList.innerHTML = '';
-                if (queue.length > 0) actionsList.innerHTML += `<li>🔴 <button onclick="app.switchView('review')" class="text-blue-600 hover:underline cursor-pointer font-medium">${queue.length} assets</button> await ownership triage in the queue.</li>`;
-                if (missingOwner > 0) actionsList.innerHTML += `<li>🟡 <button onclick="app.switchView('health')" class="text-blue-600 hover:underline cursor-pointer font-medium">${missingOwner} approved assets</button> are missing an owner assignment.</li>`;
-                if (queue.length === 0 && missingOwner === 0) actionsList.innerHTML = '<li class="text-gray-500 italic">No pending actions. You\'re all caught up.</li>';
+                const missing = register.filter(r => !r.owner || r.owner === 'Unknown').length;
+                document.getElementById('kpi-health-score').textContent = missing === 0 ? '100%' : Math.round(((register.length - missing) / register.length) * 100) + '%';
             }
 
             renderReviewQueueAnalytics(queue) {
                 const active = queue.filter(q => q.status === 'PENDING' || q.status === 'IN_REVIEW');
                 const counts = { Platform: 0, CORP: 0, Unknown: 0, Monitoring: 0, Database: 0, 'Active Directory': 0 };
-                
-                active.forEach(q => {
-                    const owner = q.suggestedOwner || 'Unknown';
-                    if (counts[owner] !== undefined) counts[owner]++;
-                    if (counts[q.detectedService] !== undefined) counts[q.detectedService]++;
-                });
-
-                const container = document.getElementById('review-analytics');
-                if(!container) return;
-                
-                container.innerHTML = `
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-blue-600 font-bold tracking-wider mb-1">Platform Cands.</p><p class="text-2xl font-black text-blue-800">${counts.Platform}</p></div>
-                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-indigo-600 font-bold tracking-wider mb-1">CORP Cands.</p><p class="text-2xl font-black text-indigo-800">${counts.CORP}</p></div>
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">Unknown</p><p class="text-2xl font-black text-gray-700">${counts.Unknown}</p></div>
-                    <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">Monitoring</p><p class="text-2xl font-bold text-gray-800">${counts.Monitoring}</p></div>
-                    <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">Database</p><p class="text-2xl font-bold text-gray-800">${counts.Database}</p></div>
-                    <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col justify-center"><p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">AD / Domain</p><p class="text-2xl font-bold text-gray-800">${counts['Active Directory']}</p></div>
+                active.forEach(q => { counts[q.suggestedOwner || 'Unknown'] = (counts[q.suggestedOwner || 'Unknown']||0) + 1; counts[q.detectedService] = (counts[q.detectedService]||0) + 1; });
+                document.getElementById('review-analytics').innerHTML = `
+                    <div class="bg-blue-50 border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Platform</p><p class="text-xl font-bold">${counts.Platform}</p></div>
+                    <div class="bg-indigo-50 border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">CORP</p><p class="text-xl font-bold">${counts.CORP}</p></div>
+                    <div class="bg-gray-50 border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Unknown</p><p class="text-xl font-bold">${counts.Unknown}</p></div>
+                    <div class="bg-white border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Monitoring</p><p class="text-xl font-bold">${counts.Monitoring}</p></div>
+                    <div class="bg-white border p-3 rounded shadow-sm"><p class="text-[10px] uppercase">Database</p><p class="text-xl font-bold">${counts.Database}</p></div>
                 `;
             }
 
             updateReviewFilters() {
-                this.reviewState.filters.state = document.getElementById('review-filter-state').value;
-                this.reviewState.filters.owner = document.getElementById('review-filter-owner').value;
-                this.reviewState.filters.service = document.getElementById('review-filter-service').value;
-                this.reviewState.filters.search = document.getElementById('review-filter-search').value;
+                this.reviewState.filters = {
+                    state: document.getElementById('review-filter-state').value,
+                    owner: document.getElementById('review-filter-owner').value,
+                    service: document.getElementById('review-filter-service').value,
+                    search: document.getElementById('review-filter-search').value.toLowerCase()
+                };
                 this.renderReviewQueue();
             }
 
             toggleReviewSelection(id, isSelected) {
-                if (isSelected) this.reviewState.selectedIds.add(id);
-                else this.reviewState.selectedIds.delete(id);
+                if (isSelected) this.reviewState.selectedIds.add(id); else this.reviewState.selectedIds.delete(id);
                 document.getElementById('review-selected-count').textContent = this.reviewState.selectedIds.size;
             }
 
             toggleSelectVisibleReviews() {
-                const selectAll = document.getElementById('review-select-all-visible').checked;
-                this.reviewState.visibleIds.forEach(id => {
-                    if (selectAll) this.reviewState.selectedIds.add(id);
-                    else this.reviewState.selectedIds.delete(id);
-                });
+                const checked = document.getElementById('review-select-all-visible').checked;
+                this.reviewState.visibleIds.forEach(id => checked ? this.reviewState.selectedIds.add(id) : this.reviewState.selectedIds.delete(id));
                 this.renderReviewQueue();
             }
 
-            selectAllFilteredReviews() {
-                this.reviewState.visibleIds.forEach(id => this.reviewState.selectedIds.add(id));
-                this.renderReviewQueue();
-            }
-
-            clearReviewSelection() {
-                this.reviewState.selectedIds.clear();
-                this.renderReviewQueue();
-            }
+            clearReviewSelection() { this.reviewState.selectedIds.clear(); this.renderReviewQueue(); }
 
             renderReviewQueue() {
                 const queue = ReviewQueueService.getQueue();
                 this.renderReviewQueueAnalytics(queue);
-
-                let filtered = queue.filter(q => {
-                    const matchState = this.reviewState.filters.state === 'ALL' || q.status === this.reviewState.filters.state;
-                    const inferredOwner = q.suggestedOwner || 'Unknown';
-                    const matchOwner = this.reviewState.filters.owner === 'ALL' || inferredOwner === this.reviewState.filters.owner;
-                    const matchService = this.reviewState.filters.service === 'ALL' || q.detectedService === this.reviewState.filters.service;
-                    const search = this.reviewState.filters.search.toLowerCase();
-                    const matchSearch = !search || q.normalizedName.toLowerCase().includes(search) || (q.originalName && q.originalName.toLowerCase().includes(search)) || (q.ipAddress && q.ipAddress.includes(search)) || q.detectedService.toLowerCase().includes(search);
-                    return matchState && matchOwner && matchService && matchSearch;
+                const filtered = queue.filter(q => {
+                    const { state, owner, service, search } = this.reviewState.filters;
+                    const o = q.suggestedOwner || 'Unknown';
+                    return (state === 'ALL' || q.status === state) && (owner === 'ALL' || o === owner) && (service === 'ALL' || q.detectedService === service) && (!search || q.normalizedName.includes(search) || (q.ipAddress||'').includes(search));
                 });
-
                 this.reviewState.visibleIds = filtered.map(q => q.id);
+                document.getElementById('review-selected-count').textContent = this.reviewState.selectedIds.size;
                 const tbody = document.getElementById('review-queue-tbody');
                 tbody.innerHTML = '';
-                document.getElementById('review-selected-count').textContent = this.reviewState.selectedIds.size;
-                document.getElementById('review-select-all-visible').checked = filtered.length > 0 && filtered.every(q => this.reviewState.selectedIds.has(q.id));
-
-                if (filtered.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500 italic bg-gray-50 border-b border-gray-200">No assets match the current queue filters.</td></tr>`;
-                    console.log(`Review Queue rows rendered: 0`); // DIAGNOSTIC ADDED
-                    return;
-                }
-
+                if(filtered.length === 0) return tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500">No assets match.</td></tr>`;
+                
+                // Using DocumentFragment to prevent browser thrashing on 1000+ rows
+                const frag = document.createDocumentFragment();
                 filtered.forEach(item => {
-                    const suggestedOwner = item.suggestedOwner || 'Unknown';
-                    const ownershipSource = item.ownershipSource || 'Unknown';
-                    const isChecked = this.reviewState.selectedIds.has(item.id) ? 'checked' : '';
+                    const isChecked = this.reviewState.selectedIds.has(item.id);
                     const tr = document.createElement('tr');
-                    tr.className = `transition ${this.reviewState.selectedIds.has(item.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50 cursor-pointer'}`;
-                    
+                    tr.className = `cursor-pointer ${isChecked ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`;
                     tr.innerHTML = `
-                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation();">
-                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="app.toggleReviewSelection('${item.id}', this.checked); this.closest('tr').classList.toggle('bg-blue-50/60', this.checked);" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 cursor-pointer">
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="font-medium text-gray-900">${item.normalizedName}</div>
-                            <div class="text-xs text-gray-500 font-mono">${item.ipAddress || 'No IP Data'}</div>
-                        </td>
-                        <td class="px-4 py-3" onclick="event.stopPropagation();">
-                            <select id="own-${item.id}" class="border-gray-300 rounded text-sm px-2 py-1 shadow-sm bg-white focus:ring-blue-500 focus:border-blue-500 mb-1 w-full">
-                                <option value="Platform" ${suggestedOwner === 'Platform' ? 'selected' : ''}>Platform</option>
-                                <option value="CORP" ${suggestedOwner === 'CORP' ? 'selected' : ''}>CORP</option>
-                                <option value="NOPS" ${suggestedOwner === 'NOPS' ? 'selected' : ''}>NOPS</option>
-                                <option value="Unknown" ${suggestedOwner === 'Unknown' ? 'selected' : ''}>Unknown</option>
-                            </select>
-                            <div class="text-[10px] text-gray-400 uppercase tracking-wide">Src: ${ownershipSource}</div>
-                        </td>
-                        <td class="px-4 py-3">
-                            <span class="bg-slate-100 text-slate-700 text-xs px-2.5 py-1 rounded-md font-medium border border-slate-200">${item.detectedService}</span>
-                        </td>
-                        <td class="px-4 py-3">
-                            <span class="text-xs font-semibold ${item.status==='PENDING'?'text-blue-600 bg-blue-50 px-2 py-1 rounded': 'text-gray-600'}">${item.status}</span>
-                        </td>
-                        <td class="px-4 py-3 text-right space-x-2" onclick="event.stopPropagation();">
-                            <button onclick="app.approveQueueItem('${item.id}')" class="text-blue-700 bg-blue-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-200 hover:text-blue-900 transition">Approve</button>
-                        </td>
+                        <td class="px-4 py-2 text-center"><input type="checkbox" value="${item.id}" ${isChecked ? 'checked' : ''} onchange="app.toggleReviewSelection('${item.id}', this.checked); this.closest('tr').classList.toggle('bg-blue-50/60', this.checked)"></td>
+                        <td class="px-4 py-2"><div class="font-medium">${item.normalizedName}</div><div class="text-xs text-gray-500">${item.ipAddress || 'No IP'}</div></td>
+                        <td class="px-4 py-2" onclick="event.stopPropagation()"><select id="own-${item.id}" class="border text-sm px-2 py-1"><option ${item.suggestedOwner==='Platform'?'selected':''}>Platform</option><option ${item.suggestedOwner==='CORP'?'selected':''}>CORP</option><option ${item.suggestedOwner==='NOPS'?'selected':''}>NOPS</option><option ${item.suggestedOwner==='Unknown'?'selected':''}>Unknown</option></select><div class="text-[10px] text-gray-400">Src: ${item.ownershipSource||'Unknown'}</div></td>
+                        <td class="px-4 py-2"><span class="bg-gray-100 text-xs px-2 py-1 rounded">${item.detectedService}</span></td>
+                        <td class="px-4 py-2 text-xs">${item.status}</td>
+                        <td class="px-4 py-2 text-right"><button onclick="event.stopPropagation(); app.approveQueueItem('${item.id}')" class="text-blue-700 bg-blue-100 px-3 py-1 rounded text-xs">Approve</button></td>
                     `;
-                    tr.onclick = () => {
-                         const cb = tr.querySelector('input[type="checkbox"]');
-                         cb.checked = !cb.checked;
-                         this.toggleReviewSelection(item.id, cb.checked);
-                         tr.classList.toggle('bg-blue-50/60', cb.checked);
-                    };
-                    tbody.appendChild(tr);
+                    tr.onclick = () => { const cb = tr.querySelector('input'); cb.checked = !cb.checked; this.toggleReviewSelection(item.id, cb.checked); tr.classList.toggle('bg-blue-50/60', cb.checked); };
+                    frag.appendChild(tr);
                 });
-
-                console.log(`Review Queue rows rendered: ${filtered.length}`); // DIAGNOSTIC ADDED
+                tbody.appendChild(frag);
             }
 
             promptBulkAction(action, owner) {
-                if (this.reviewState.selectedIds.size === 0) {
-                    alert("Please select at least one asset to perform a bulk action.");
-                    return;
-                }
+                if (this.reviewState.selectedIds.size === 0) return alert("Select an asset.");
                 this.reviewState.pendingAction = { action, owner };
-                const queue = ReviewQueueService.getQueue();
-                const selectedItems = queue.filter(q => this.reviewState.selectedIds.has(q.id));
-                const services = [...new Set(selectedItems.map(q => q.detectedService))].filter(s => s).join(', ');
-
                 document.getElementById('bulk-confirm-count').textContent = this.reviewState.selectedIds.size;
                 document.getElementById('bulk-confirm-action').textContent = action;
-                document.getElementById('bulk-confirm-owner').textContent = action === 'APPROVE' ? owner : 'N/A';
-                document.getElementById('bulk-confirm-owner-wrap').style.display = action === 'APPROVE' ? 'block' : 'none';
-                document.getElementById('bulk-confirm-services').textContent = services || 'None specified';
+                document.getElementById('bulk-confirm-owner').textContent = owner || 'N/A';
                 document.getElementById('modal-bulk-confirm').classList.remove('hidden');
             }
 
             executeBulkAction() {
                 const { action, owner } = this.reviewState.pendingAction;
                 const queue = ReviewQueueService.getQueue();
-                const selectedItems = queue.filter(q => this.reviewState.selectedIds.has(q.id));
-                const processedCount = selectedItems.length;
-
-                const resolutions = selectedItems.map(item => {
-                    return { id: item.id, finalOwner: action === 'APPROVE' ? owner : 'Unknown', finalService: item.detectedService };
-                });
-
-                let status = ReviewQueueService.STATES.APPROVED;
-                if (action === 'REJECT') status = ReviewQueueService.STATES.REJECTED;
-                if (action === 'ESCALATE') status = ReviewQueueService.STATES.ESCALATED;
-
-                ReviewQueueService.resolveBulk(resolutions, status);
+                const items = queue.filter(q => this.reviewState.selectedIds.has(q.id));
+                const res = items.map(i => ({ id: i.id, finalOwner: owner || 'Unknown', finalService: i.detectedService }));
+                ReviewQueueService.resolveBulk(res, action === 'APPROVE' ? 'APPROVED' : 'REJECTED');
                 this.reviewState.selectedIds.clear();
-                this.reviewState.pendingAction = null;
-                
-                document.getElementById('modal-bulk-confirm').classList.add('hidden');
+                this.closeModals();
                 this.updateGlobalBadges();
                 this.renderReviewQueue();
-
-                const remaining = ReviewQueueService.getQueue().filter(q => ['PENDING', 'IN_REVIEW'].includes(q.status)).length;
-                document.getElementById('bulk-rep-processed').textContent = processedCount;
-                document.getElementById('bulk-rep-remaining').textContent = remaining;
+                document.getElementById('bulk-rep-processed').textContent = items.length;
+                document.getElementById('bulk-rep-remaining').textContent = ReviewQueueService.getQueue().filter(q => q.status === 'PENDING').length;
                 document.getElementById('modal-bulk-report').classList.remove('hidden');
             }
 
-            closeModals() {
-                document.getElementById('modal-bulk-confirm').classList.add('hidden');
-                document.getElementById('modal-bulk-report').classList.add('hidden');
-                document.getElementById('modal-reset-confirm').classList.add('hidden');
-                document.getElementById('modal-edit-asset').classList.add('hidden');
-                document.getElementById('modal-delete-confirm').classList.add('hidden');
-            }
+            closeModals() { document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden')); }
 
-            editAsset(normalizedName) {
-                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                const asset = register.find(r => r.normalizedName === normalizedName);
-                if (!asset) return;
-                
-                this.registerState.editingAsset = asset.normalizedName;
-                document.getElementById('edit-asset-name').textContent = asset.normalizedName;
-                document.getElementById('edit-asset-owner').value = asset.owner || 'Unknown';
-                document.getElementById('edit-asset-service').value = asset.service || '';
-                document.getElementById('edit-asset-env').value = asset.environment || 'Prod';
-                document.getElementById('edit-asset-status').value = asset.status || 'Approved';
-                document.getElementById('edit-asset-exposure').value = asset.exposure || 'Unknown';
-                document.getElementById('edit-asset-criticality').value = asset.criticality || 'Medium';
-                
+            editAsset(name) {
+                const r = StorageService.load(StorageService.KEYS.ASSET_REGISTER).find(x => x.normalizedName === name);
+                if(!r) return;
+                this.registerState.editingAsset = name;
+                document.getElementById('edit-asset-name').textContent = name;
+                document.getElementById('edit-asset-owner').value = r.owner;
+                document.getElementById('edit-asset-service').value = r.service;
                 document.getElementById('modal-edit-asset').classList.remove('hidden');
             }
 
             saveAssetEdit() {
-                const normalizedName = this.registerState.editingAsset;
-                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                const idx = register.findIndex(r => r.normalizedName === normalizedName);
-                
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const idx = reg.findIndex(r => r.normalizedName === this.registerState.editingAsset);
                 if (idx > -1) {
-                    register[idx].owner = document.getElementById('edit-asset-owner').value;
-                    register[idx].service = document.getElementById('edit-asset-service').value;
-                    register[idx].environment = document.getElementById('edit-asset-env').value;
-                    register[idx].status = document.getElementById('edit-asset-status').value;
-                    register[idx].exposure = document.getElementById('edit-asset-exposure').value;
-                    register[idx].criticality = document.getElementById('edit-asset-criticality').value;
-                    register[idx].effectiveRiskScore = RiskScoringEngine.calculateEffectiveRisk(register[idx].baseRiskScore, register[idx].exposure);
-                    StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
-                    
-                    this.renderRegister();
-                    this.renderHealth();
-                    this.renderDashboard();
-                    this.closeModals();
+                    reg[idx].owner = document.getElementById('edit-asset-owner').value;
+                    reg[idx].service = document.getElementById('edit-asset-service').value;
+                    StorageService.save(StorageService.KEYS.ASSET_REGISTER, reg);
+                    this.renderRegister(); this.closeModals();
                 }
             }
 
-            promptDeleteAsset(normalizedName) {
-                this.registerState.deletingAsset = normalizedName;
-                document.getElementById('delete-confirm-name').textContent = normalizedName;
+            promptDeleteAsset(name) {
+                this.registerState.deletingAsset = name;
+                document.getElementById('delete-confirm-name').textContent = name;
                 document.getElementById('modal-delete-confirm').classList.remove('hidden');
             }
 
             executeDeleteAsset() {
-                const normalizedName = this.registerState.deletingAsset;
-                let register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                register = register.filter(r => r.normalizedName !== normalizedName);
-                StorageService.save(StorageService.KEYS.ASSET_REGISTER, register);
-                
-                this.renderRegister();
-                this.renderHealth();
-                this.renderDashboard();
-                this.closeModals();
+                let reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER).filter(r => r.normalizedName !== this.registerState.deletingAsset);
+                StorageService.save(StorageService.KEYS.ASSET_REGISTER, reg);
+                this.renderRegister(); this.closeModals();
             }
 
             approveQueueItem(id) {
-                const owner = document.getElementById(`own-${id}`).value;
-                const queueItem = ReviewQueueService.getQueue().find(q => q.id === id);
-                ReviewQueueService.resolve(id, owner, queueItem.detectedService, ReviewQueueService.STATES.APPROVED);
-                this.updateGlobalBadges();
-                this.renderReviewQueue();
+                const o = document.getElementById(`own-${id}`).value;
+                const q = ReviewQueueService.getQueue().find(x => x.id === id);
+                ReviewQueueService.resolve(id, o, q.detectedService, 'APPROVED');
+                this.updateGlobalBadges(); this.renderReviewQueue();
             }
 
             renderRegister() {
-                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 const query = document.getElementById('register-search').value.toLowerCase();
                 const tbody = document.getElementById('register-tbody');
                 tbody.innerHTML = '';
-
-                const filtered = register.filter(r => r.normalizedName.toLowerCase().includes(query) || (r.owner && r.owner.toLowerCase().includes(query)));
-
-                filtered.forEach(r => {
-                    const statusClass = r.status === 'Retired' ? 'bg-gray-200 text-gray-700' : (r.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800');
-                    const tr = `<tr>
-                        <td class="px-6 py-3 font-medium text-slate-800">${r.normalizedName}</td>
-                        <td class="px-6 py-3"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-semibold">${r.owner || 'Unassigned'}</span></td>
-                        <td class="px-6 py-3 text-slate-600 text-sm">${r.service || 'Unknown'}</td>
-                        <td class="px-6 py-3 text-slate-500 text-sm">${r.environment || 'Prod'}</td>
-                        <td class="px-6 py-3"><span class="${statusClass} text-xs px-2 py-1 rounded">${r.status || 'Active'}</span></td>
-                        <td class="px-6 py-3 text-sm text-slate-600">
-                            <div>Exp: <span class="font-medium">${r.exposure || 'Unknown'}</span></div>
-                            <div class="text-xs">Risk: <span class="font-bold ${r.effectiveRiskScore > 0 ? 'text-red-600' : 'text-gray-500'}">${r.effectiveRiskScore || 0}</span></div>
-                        </td>
-                        <td class="px-6 py-3 text-right space-x-3">
-                            <button onclick="app.editAsset('${r.normalizedName}')" class="text-blue-700 bg-blue-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-200 hover:text-blue-900 transition">Edit</button>
-                            <button onclick="app.promptDeleteAsset('${r.normalizedName}')" class="text-red-700 bg-red-100 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-200 hover:text-red-900 transition">Delete</button>
-                        </td>
-                    </tr>`;
-                    tbody.innerHTML += tr;
+                StorageService.load(StorageService.KEYS.ASSET_REGISTER).filter(r => r.normalizedName.includes(query)).forEach(r => {
+                    tbody.innerHTML += `<tr><td class="px-6 py-2">${r.normalizedName}</td><td class="px-6 py-2">${r.owner}</td><td class="px-6 py-2">${r.service}</td><td class="px-6 py-2">${r.environment}</td><td class="px-6 py-2">${r.status}</td><td class="px-6 py-2">${r.exposure}</td><td class="px-6 py-2 text-right"><button onclick="app.editAsset('${r.normalizedName}')" class="text-blue-600 px-2">Edit</button><button onclick="app.promptDeleteAsset('${r.normalizedName}')" class="text-red-600 px-2">Del</button></td></tr>`;
                 });
             }
 
             renderHealth() {
-                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                const listOwner = document.getElementById('health-missing-owner');
-                const listService = document.getElementById('health-missing-service');
-                
-                listOwner.innerHTML = '';
-                listService.innerHTML = '';
-
-                const missingOwners = register.filter(r => !r.owner || r.owner === 'Unknown');
-                const missingServices = register.filter(r => !r.service || r.service === 'Unclassified' || r.service === 'Unknown');
-
-                if (missingOwners.length === 0) listOwner.innerHTML = '<li class="text-emerald-600">✅ All assets have assigned owners.</li>';
-                missingOwners.forEach(r => listOwner.innerHTML += `<li>• ${r.normalizedName}</li>`);
-
-                if (missingServices.length === 0) listService.innerHTML = '<li class="text-emerald-600">✅ All assets have classified services.</li>';
-                missingServices.forEach(r => listService.innerHTML += `<li>• ${r.normalizedName}</li>`);
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const lo = document.getElementById('health-missing-owner'); lo.innerHTML = '';
+                const ls = document.getElementById('health-missing-service'); ls.innerHTML = '';
+                reg.filter(r => !r.owner || r.owner === 'Unknown').forEach(r => lo.innerHTML += `<li>${r.normalizedName}</li>`);
+                reg.filter(r => !r.service || r.service === 'Unclassified').forEach(r => ls.innerHTML += `<li>${r.normalizedName}</li>`);
             }
 
             renderReports() {
-                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                
-                const platformAssets = register.filter(r => r.owner === 'Platform');
-                
-                document.getElementById('rpt-total').textContent = register.length;
-                document.getElementById('rpt-platform').textContent = platformAssets.length;
-                document.getElementById('rpt-other').textContent = register.length - platformAssets.length;
-                
-                const q = ReviewQueueService.getQueue().filter(x => x.status === 'PENDING' || x.status === 'IN_REVIEW');
-                document.getElementById('rpt-queue').textContent = q.length;
-                
-                const missingOwner = register.filter(r => !r.owner || r.owner === 'Unknown').length;
-                document.getElementById('rpt-health').textContent = missingOwner === 0 ? '100%' : Math.round(((register.length - missingOwner) / register.length) * 100) + '%';
-
-                const sourcesList = document.getElementById('rpt-ownership-sources');
-                if (sourcesList) {
-                    const sourceCounts = { 'Platform Inventory': 0, 'Naming Convention': 0, 'Manual Decision': 0, 'Unknown': 0 };
-                    platformAssets.forEach(a => {
-                        const src = a.ownershipSource || 'Manual Decision';
-                        if(sourceCounts[src] !== undefined) sourceCounts[src]++;
-                        else sourceCounts['Manual Decision']++;
-                    });
-
-                    sourcesList.innerHTML = `
-                        <li><strong class="text-slate-900">${sourceCounts['Platform Inventory']}</strong> matches from imported Platform Inventory (Authoritative match).</li>
-                        <li><strong class="text-slate-900">${sourceCounts['Naming Convention']}</strong> matches from advisory naming conventions (e.g. Database, Monitoring).</li>
-                        <li><strong class="text-slate-900">${sourceCounts['Manual Decision']}</strong> matches from manual analyst decisions or previous triage.</li>
-                    `;
-                }
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                document.getElementById('rpt-total').textContent = reg.length;
+                document.getElementById('rpt-platform').textContent = reg.filter(r => r.owner === 'Platform').length;
+                document.getElementById('rpt-other').textContent = reg.filter(r => r.owner !== 'Platform').length;
             }
 
-            exportDatabase() {
-                StorageService.exportDatabase();
-            }
+            exportDatabase() { StorageService.exportDatabase(); }
+            promptReset() { document.getElementById('modal-reset-confirm').classList.remove('hidden'); }
+            executeReset() { StorageService.clearAll(); window.location.reload(); }
 
             importVulnData(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-
-                const resDiv = document.getElementById('vuln-import-result');
-                if(resDiv) resDiv.classList.add('hidden');
-
-                Papa.parse(file, {
-                    header: false,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        let headerIdx = -1;
-                        for(let i=0; i<Math.min(20, results.data.length); i++) {
-                            if(results.data[i].some(c => /^(qid|cve(.?id)?|asset.?name)$/i.test(String(c).trim()))) {
-                                headerIdx = i;
-                                break;
-                            }
-                        }
-
-                        if(headerIdx === -1 && resDiv) {
-                            resDiv.innerHTML = '❌ Could not detect vulnerability headers in CSV.';
-                            resDiv.className = 'text-sm font-medium p-3 rounded border text-red-700 bg-red-50 border-red-200 mt-4';
-                            return;
-                        }
-
-                        const headers = results.data[headerIdx].map(h => String(h).trim().toLowerCase());
-                        const getCol = (regex) => headers.findIndex(h => regex.test(h));
-
-                        const map = {
-                            assetName: getCol(/^(asset.?name|hostname)$/i),
-                            qid: getCol(/^qid$/i),
-                            cve: getCol(/^cve(.?id)?$/i),
-                            severity: getCol(/^severity$/i),
-                            cvss: getCol(/^cvss/i),
-                            truRisk: getCol(/^trurisk/i),
-                            firstDetected: getCol(/^first.?detected/i),
-                            lastDetected: getCol(/^last.?detected/i)
-                        };
-
-                        if((map.assetName === -1 || map.qid === -1) && resDiv) {
-                            resDiv.innerHTML = '❌ CSV is missing required columns (Asset Name or QID).';
-                            resDiv.className = 'text-sm font-medium p-3 rounded border text-red-700 bg-red-50 border-red-200 mt-4';
-                            return;
-                        }
-
-                        const vulns = [];
-                        for(let i=headerIdx+1; i<results.data.length; i++) {
-                            const row = results.data[i];
-                            const rawName = row[map.assetName];
-                            if(!rawName) continue;
-                            
-                            vulns.push({
-                                normalizedName: AssetIdentityService.normalize(rawName),
-                                qid: row[map.qid],
-                                cve: map.cve !== -1 ? row[map.cve] : '',
-                                severity: map.severity !== -1 ? parseFloat(row[map.severity]) || 0 : 0,
-                                cvss: map.cvss !== -1 ? parseFloat(row[map.cvss]) || 0 : 0,
-                                truRisk: map.truRisk !== -1 ? parseFloat(row[map.truRisk]) || 0 : 0,
-                                firstDetected: map.firstDetected !== -1 ? row[map.firstDetected] : '',
-                                lastDetected: map.lastDetected !== -1 ? row[map.lastDetected] : ''
-                            });
-                        }
-
-                        StorageService.save(StorageService.KEYS.VULNERABILITY_REGISTER, vulns);
-                        
-                        if(resDiv) {
-                            resDiv.innerHTML = `✅ Successfully imported and mapped <strong>${vulns.length}</strong> vulnerability records.`;
-                            resDiv.className = 'text-sm font-medium p-3 rounded border text-emerald-700 bg-emerald-50 border-emerald-200 mt-4';
-                        }
-                        
-                        this.renderVulnDashboard();
-                    }
-                });
+                Papa.parse(file, { header: true, skipEmptyLines: true, complete: (res) => {
+                    const vulns = res.data.map(r => ({
+                        normalizedName: AssetIdentityService.normalize(r['Asset Name'] || r['Hostname']),
+                        cve: r['CVE'] || '', truRisk: parseFloat(r['TruRisk']) || 0
+                    })).filter(v => v.normalizedName !== 'unknown-asset');
+                    StorageService.save(StorageService.KEYS.VULNERABILITY_REGISTER, vulns);
+                    this.renderVulnDashboard();
+                }});
             }
 
             renderVulnDashboard() {
                 const vulns = StorageService.load(StorageService.KEYS.VULNERABILITY_REGISTER);
-                const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                
-                const assetMap = {};
-                register.forEach(r => {
-                    if (r.normalizedName) assetMap[r.normalizedName] = r;
-                    if (r.assetId) assetMap[r.assetId] = r;
-                    if (r.hostId) assetMap[r.hostId] = r;
-                });
-
-                const assetRiskMap = {};
-                const cveImpactMap = {};
-                
-                let platformVulnCount = 0;
-                let platformHighSevCount = 0;
-                let platformTotalRisk = 0;
-
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const map = {}; reg.forEach(r => map[r.normalizedName] = r);
+                const riskMap = {};
                 vulns.forEach(v => {
-                    const asset = assetMap[v.normalizedName];
-                    if (!asset) return; 
-
-                    const expMult = RiskScoringEngine.getMultiplier(asset.exposure);
-                    const weightedRisk = v.truRisk * expMult;
-
-                    if (!assetRiskMap[asset.normalizedName]) {
-                        assetRiskMap[asset.normalizedName] = { 
-                            name: asset.normalizedName, 
-                            owner: asset.owner || 'Unknown',
-                            exposure: asset.exposure || 'Unknown',
-                            vulnCount: 0, 
-                            totalWeightedRisk: 0 
-                        };
-                    }
-                    assetRiskMap[asset.normalizedName].vulnCount++;
-                    assetRiskMap[asset.normalizedName].totalWeightedRisk += weightedRisk;
-
-                    if (v.cve && v.cve !== 'N/A' && v.cve !== '-') {
-                        const cves = v.cve.split(',').map(c => c.trim());
-                        cves.forEach(c => {
-                            if(!cveImpactMap[c]) cveImpactMap[c] = 0;
-                            cveImpactMap[c] += weightedRisk;
-                        });
-                    }
-
-                    if (asset.owner === 'Platform') {
-                        platformVulnCount++;
-                        if (v.severity >= 4 || v.cvss >= 7.0 || v.truRisk >= 700) platformHighSevCount++;
-                        platformTotalRisk += weightedRisk;
-                    }
+                    const a = map[v.normalizedName]; if(!a) return;
+                    if(!riskMap[a.normalizedName]) riskMap[a.normalizedName] = { name: a.normalizedName, owner: a.owner, risk: 0 };
+                    riskMap[a.normalizedName].risk += (v.truRisk * RiskScoringEngine.getMultiplier(a.exposure));
                 });
-
-                const topAssets = Object.values(assetRiskMap).sort((a, b) => b.totalWeightedRisk - a.totalWeightedRisk).slice(0, 10);
-                const assetTbody = document.getElementById('vuln-top-assets');
-                if (assetTbody) {
-                    assetTbody.innerHTML = topAssets.map(a => `
-                        <tr>
-                            <td class="px-4 py-2 font-medium text-slate-800">${a.name}</td>
-                            <td class="px-4 py-2"><span class="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded font-semibold uppercase">${a.owner}</span></td>
-                            <td class="px-4 py-2 text-slate-600 text-xs">${a.exposure}</td>
-                            <td class="px-4 py-2 text-slate-600 text-center">${a.vulnCount}</td>
-                            <td class="px-4 py-2 text-right font-bold text-red-600">${Math.round(a.totalWeightedRisk)}</td>
-                        </tr>
-                    `).join('') || `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500 italic">No vulnerabilities matched to Asset Register.</td></tr>`;
-                }
-
-                const topCVEs = Object.entries(cveImpactMap).map(([cve, impact]) => ({cve, impact})).sort((a, b) => b.impact - a.impact).slice(0, 10);
-                const cveTbody = document.getElementById('vuln-top-cves');
-                if (cveTbody) {
-                    cveTbody.innerHTML = topCVEs.map(c => `
-                        <tr>
-                            <td class="px-4 py-2 font-medium text-slate-800">${c.cve}</td>
-                            <td class="px-4 py-2 text-right font-bold text-red-600">${Math.round(c.impact)}</td>
-                        </tr>
-                    `).join('') || `<tr><td colspan="2" class="px-4 py-8 text-center text-gray-500 italic">No CVE data extracted.</td></tr>`;
-                }
-
-                const summaryDiv = document.getElementById('vuln-summary-metrics');
-                if (summaryDiv) {
-                    summaryDiv.innerHTML = `
-                        <div class="p-4 bg-gray-50 rounded border"><p class="text-xs uppercase text-gray-500 font-semibold tracking-wide">Total Platform Vulns</p><p class="text-3xl font-bold text-gray-900 mt-1">${platformVulnCount}</p></div>
-                        <div class="p-4 bg-red-50 rounded border border-red-100"><p class="text-xs uppercase text-red-600 font-semibold tracking-wide">High/Crit Severity</p><p class="text-3xl font-bold text-red-700 mt-1">${platformHighSevCount}</p></div>
-                        <div class="p-4 bg-gray-50 rounded border"><p class="text-xs uppercase text-gray-500 font-semibold tracking-wide">Agg. Weighted Risk</p><p class="text-3xl font-bold text-gray-900 mt-1">${Math.round(platformTotalRisk)}</p></div>
-                        <div class="p-4 bg-gray-50 rounded border"><p class="text-xs uppercase text-gray-500 font-semibold tracking-wide">Assets Impacted</p><p class="text-3xl font-bold text-gray-900 mt-1">${Object.values(assetRiskMap).filter(a => a.owner === 'Platform').length}</p></div>
-                    `;
-                }
-            }
-
-            promptReset() {
-                document.getElementById('modal-reset-confirm').classList.remove('hidden');
-            }
-
-            executeReset() {
-                StorageService.clearAll();
-                window.location.reload();
+                const top = Object.values(riskMap).sort((a,b) => b.risk - a.risk).slice(0,10);
+                document.getElementById('vuln-top-assets').innerHTML = top.map(t => `<tr><td class="px-4 py-2">${t.name}</td><td class="px-4 py-2">${t.owner}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk}</td></tr>`).join('');
+                document.getElementById('vuln-summary-metrics').innerHTML = `<div class="p-4 bg-gray-50 border"><p class="text-xs">Mapped Vulns</p><p class="text-2xl">${vulns.length}</p></div>`;
             }
         }
 
-        // Boot Application - Safe instance creation
-        window.onload = () => {
-            if (!window.app) {
-                window.app = new App();
-                window.app.init();
-            }
-        };
+        window.onload = () => { if (!window.app) { window.app = new App(); window.app.init(); } };
     </script>
 </body>
 </html>
