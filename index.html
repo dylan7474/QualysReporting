@@ -267,7 +267,7 @@
             </section>
 
             <!-- VIEW: VULN MANAGEMENT -->
-            <section id="view-vuln" class="view-section h-full flex flex-col space-y-4">
+            <section id="view-vuln" class="view-section space-y-4">
                 <div class="flex justify-between items-end">
                     <h3 class="text-xl font-semibold">Vulnerability Management</h3>
                     <div class="flex space-x-2">
@@ -291,56 +291,24 @@
 
                 <div id="vuln-coverage"></div>
 
-                <!-- KPIs -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="vuln-summary-metrics">
-                    <!-- Populated by JS -->
-                </div>
+                <!-- KPI tiles: click to filter or jump to a tab -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="vuln-summary-metrics"></div>
 
                 <!-- Filters -->
                 <div class="bg-white p-4 rounded-lg shadow border flex flex-wrap gap-4 items-end">
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Priority</label><select id="vuln-filter-tier" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All priorities</option><option value="1">Fix now only</option><option value="2">This sprint or higher</option><option value="3">Scheduled or higher</option></select></div>
                     <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Patchable Only</label><select id="vuln-filter-patchable" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Findings</option><option value="YES">Patchable</option></select></div>
                     <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Severity</label><select id="vuln-filter-severity" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Severities</option><option value="4+">Severity 4 & 5</option><option value="5">Severity 5 Only</option></select></div>
                     <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Owner</label><select id="vuln-filter-owner" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Teams</option><option value="Platform">Platform</option><option value="CORP">CORP</option><option value="NOPS">NOPS</option></select></div>
                     <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Exposure</label><select id="vuln-filter-exposure" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Exposures</option><option value="Internet Facing">Internet Facing</option><option value="DMZ">DMZ</option><option value="Internal">Internal</option></select></div>
                     <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Risk Status</label><select id="vuln-filter-riskstatus" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Statuses</option><option value="Open" selected>Open (Actionable)</option><option value="Risk Accepted">Risk Accepted</option><option value="Awaiting Patch">Awaiting Patch</option></select></div>
+                    <button id="vuln-clear-filters" onclick="app.vulnClearFilters()" class="hidden text-xs text-blue-700 underline pb-2">Clear filters</button>
                 </div>
 
-                <!-- Grid for Tables -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 overflow-hidden min-h-[300px]">
-                    <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
-                        <div class="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-                            <h4 class="font-semibold text-gray-700 text-sm">Highest Risk Assets <span class="font-normal text-gray-400">(criticality, then TruRisk)</span></h4>
-                            <button onclick="app.openBulkRiskModal('vuln')" class="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-1 rounded shadow-sm hover:bg-amber-200">⚖️ Bulk Accept Risk</button>
-                        </div>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-3 py-2 w-8 text-center"><input type="checkbox" id="vuln-select-all" onchange="app.toggleAllVuln(this.checked)" class="rounded border-gray-300"></th><th class="px-2 py-2">Asset</th><th class="px-2 py-2">Owner</th><th class="px-2 py-2 text-center">Crit</th><th class="px-2 py-2">TruRisk</th><th class="px-2 py-2 text-right">Detections</th><th class="px-2 py-2 text-right">Fix now</th><th class="px-2 py-2 text-right">Action</th></tr></thead><tbody id="vuln-top-assets" class="divide-y"></tbody></table>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
-                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Fix Priority Queue <span class="font-normal text-gray-400">(by vulnerability, across assets)</span></h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Fix</th><th class="px-4 py-2 text-right">Assets</th><th class="px-4 py-2 text-center">Priority</th><th class="px-4 py-2 text-right">QVS</th></tr></thead><tbody id="vuln-top-patchable" class="divide-y"></tbody></table>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
-                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Teams</h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Team</th><th class="px-4 py-2">Assets</th><th class="px-4 py-2">Highest TruRisk</th><th class="px-4 py-2 text-right">Fix now</th></tr></thead><tbody id="vuln-top-teams" class="divide-y"></tbody></table>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
-                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Services</h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Service</th><th class="px-4 py-2">Assets</th><th class="px-4 py-2">Highest TruRisk</th><th class="px-4 py-2 text-right">Fix now</th></tr></thead><tbody id="vuln-top-services" class="divide-y"></tbody></table>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="bg-white rounded shadow border flex flex-col overflow-hidden h-64 shrink-0">
-                    <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Known-Exploited Vulnerabilities <span class="font-normal text-gray-400">(CISA KEV, active attacks, ransomware, wormable, zero-day)</span></h4>
-                    <div class="overflow-auto flex-1">
-                        <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">CVE</th><th class="px-4 py-2">Title</th><th class="px-4 py-2 text-right">Assets</th><th class="px-4 py-2 text-right">QVS</th></tr></thead><tbody id="vuln-top-cves" class="divide-y"></tbody></table>
-                    </div>
+                <!-- Tabs: one table at a time, full width -->
+                <div class="bg-white rounded-lg shadow border">
+                    <div id="vuln-tabs" role="tablist" class="flex flex-wrap border-b px-2 pt-1"></div>
+                    <div id="vuln-tab-body"></div>
                 </div>
             </section>
 
@@ -1568,7 +1536,12 @@
                 this.importController = new ImportController(this);
                 this.reviewState = { filters: { state: 'PENDING', owner: 'ALL', service: 'ALL', search: '' }, selectedIds: new Set(), visibleIds: [], pendingAction: null };
                 this.registerState = { editingAsset: null, deletingAsset: null, selectedAssets: new Set() };
-                this.vulnState = { filters: { patchable: 'ALL', severity: 'ALL', owner: 'ALL', exposure: 'ALL', riskStatus: 'Open' }, selectedAssets: new Set() };
+                this.vulnState = {
+                    filters: { ...App.VULN_DEFAULT_FILTERS }, selectedAssets: new Set(), tab: 'assets', coverageOpen: false,
+                    tables: { assets: { key: null, dir: 1, q: '', size: '25', page: 0 }, fixes: { key: null, dir: 1, q: '', size: '25', page: 0 }, exploited: { key: null, dir: 1, q: '', size: '25', page: 0 } }
+                };
+                this.vulnData = null;
+                this.vulnVisible = [];
                 this.raState = { selectedAssets: [], filteredAssets: [] };
                 this.inspectState = { stack: [], filters: { tier: 'ALL', patchable: 'ALL', q: '' } };
                 this.inspectCtx = null;
@@ -1878,13 +1851,9 @@
             executeReset() { StorageService.clearAll(); VulnStore.clear().catch(() => {}).finally(() => window.location.reload()); }
 
             updateVulnFilters() {
-                this.vulnState.filters = {
-                    patchable: document.getElementById('vuln-filter-patchable').value,
-                    severity: document.getElementById('vuln-filter-severity').value,
-                    owner: document.getElementById('vuln-filter-owner').value,
-                    exposure: document.getElementById('vuln-filter-exposure').value,
-                    riskStatus: document.getElementById('vuln-filter-riskstatus').value
-                };
+                const v = (id) => document.getElementById(id).value;
+                this.vulnState.filters = { patchable: v('vuln-filter-patchable'), severity: v('vuln-filter-severity'), owner: v('vuln-filter-owner'), exposure: v('vuln-filter-exposure'), riskStatus: v('vuln-filter-riskstatus'), tier: v('vuln-filter-tier') };
+                Object.values(this.vulnState.tables).forEach(t => { t.page = 0; });
                 this.renderVulnDashboard();
             }
 
@@ -1920,7 +1889,7 @@
             }
 
             // Registered assets in scope joined to their detections, with the filters applied at detection level.
-            async scopedData({ owner = 'ALL', exposure = 'ALL', riskStatus = 'ALL', patchable = 'ALL', severity = 'ALL' } = {}) {
+            async scopedData({ owner = 'ALL', exposure = 'ALL', riskStatus = 'ALL', patchable = 'ALL', severity = 'ALL', tier = 'ALL' } = {}) {
                 const vd = await this.getVulnData();
                 const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 const regMap = new Map(reg.map(r => [r.normalizedName, r]));
@@ -1937,6 +1906,7 @@
                         if (patchable === 'YES' && !d.patchable) continue;
                         if (severity === '5' && d.sev < 5) continue;
                         if (severity === '4+' && d.sev < 4) continue;
+                        if (tier !== 'ALL' && d.tier > +tier) continue;
                         dets.push(d);
                         if (!stats.has(name)) stats.set(name, PriorityEngine.blank());
                         PriorityEngine.accumulate(stats.get(name), d);
@@ -2158,52 +2128,74 @@
                 });
             }
 
+            // ------------------------------------------
+            // Vulnerability Management page: KPI tiles, filters, tabs, sortable tables
+            // ------------------------------------------
+
+            syncVulnFilterControls() {
+                const f = this.vulnState.filters;
+                const map = { patchable: 'vuln-filter-patchable', severity: 'vuln-filter-severity', owner: 'vuln-filter-owner', exposure: 'vuln-filter-exposure', riskStatus: 'vuln-filter-riskstatus', tier: 'vuln-filter-tier' };
+                Object.entries(map).forEach(([k, id]) => { const el = document.getElementById(id); if (el) el.value = f[k]; });
+            }
+
+            vulnSetFilter(key, val) {
+                this.vulnState.filters[key] = val;
+                this.syncVulnFilterControls();
+                Object.values(this.vulnState.tables).forEach(t => { t.page = 0; });
+                this.renderVulnDashboard();
+            }
+
+            // KPI tiles act as toggles: click once to filter, again to clear.
+            vulnToggleFilter(key, val) {
+                this.vulnSetFilter(key, this.vulnState.filters[key] === val ? App.VULN_DEFAULT_FILTERS[key] : val);
+            }
+
+            vulnClearFilters() {
+                this.vulnState.filters = { ...App.VULN_DEFAULT_FILTERS };
+                this.syncVulnFilterControls();
+                Object.values(this.vulnState.tables).forEach(t => { t.page = 0; });
+                this.renderVulnDashboard();
+            }
+
+            vulnTab(tab) {
+                this.vulnState.tab = tab;
+                this.renderVulnTabs();
+            }
+
+            toggleVulnCoverage() {
+                this.vulnState.coverageOpen = !this.vulnState.coverageOpen;
+                const f = this.vulnState.filters;
+                document.getElementById('vuln-coverage').innerHTML = this.coverageChipHTML(f.owner, f.riskStatus);
+            }
+
+            // One line while collapsed; the full explanation (truncation, unmatched assets, asset list) on click.
+            coverageChipHTML(scope = 'ALL', riskStatus = 'ALL') {
+                const meta = this.loadVulnMeta();
+                if (!meta.imports.length) return this.coverageHTML(scope, riskStatus);
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER)
+                    .filter(r => (scope === 'ALL' || r.owner === scope) && (riskStatus === 'ALL' || (r.riskStatus || 'Open') === riskStatus));
+                const have = new Set((StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).map(s => s.name));
+                const n = reg.filter(r => have.has(r.normalizedName)).length;
+                const pct = reg.length ? Math.round(n / reg.length * 100) : 0;
+                const truncated = meta.imports.some(i => i.truncated);
+                const ok = !truncated && pct === 100;
+                const open = this.vulnState.coverageOpen;
+                return `<button onclick="app.toggleVulnCoverage()" aria-expanded="${open}" class="w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg border text-sm ${ok ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-900'}">
+                        <span>${ok ? '✅' : '⚠️'}</span><span class="font-semibold">Data covers ${fmtNum(n)} of ${fmtNum(reg.length)} assets (${pct}%)</span>${truncated ? '<span class="text-xs">· Qualys export truncated</span>' : ''}
+                        <span class="ml-auto text-xs underline">${open ? 'Hide details' : 'Details'}</span></button>${open ? `<div class="mt-2">${this.coverageHTML(scope, riskStatus)}</div>` : ''}`;
+            }
+
             async renderVulnDashboard() {
                 const f = this.vulnState.filters;
                 const { dets, assets, vd } = await this.scopedData(f);
                 if (this.currentView !== 'vuln') return;
+                const $ = (id) => document.getElementById(id);
 
-                document.getElementById('vuln-coverage').innerHTML = this.coverageHTML(f.owner, f.riskStatus);
+                $('vuln-coverage').innerHTML = this.coverageChipHTML(f.owner, f.riskStatus);
+                $('vuln-clear-filters').classList.toggle('hidden', Object.keys(App.VULN_DEFAULT_FILTERS).every(k => f[k] === App.VULN_DEFAULT_FILTERS[k]));
 
-                const t1 = dets.filter(d => d.tier === 1);
-                const patchPct = dets.length ? Math.round(dets.filter(d => d.patchable).length / dets.length * 100) : 0;
-                document.getElementById('vuln-summary-metrics').innerHTML = `
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Assets With Findings</p><p class="text-2xl font-bold text-gray-900">${fmtNum(assets.length)}</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Distinct Detections</p><p class="text-2xl font-bold text-gray-900">${fmtNum(dets.length)}</p></div>
-                    <div class="p-4 bg-red-50 rounded border border-red-200 shadow-sm"><p class="text-xs text-red-700 uppercase font-semibold">Fix Now (exploited)</p><p class="text-2xl font-bold text-red-800">${fmtNum(t1.length)}</p><p class="text-[10px] text-red-700">on ${fmtNum(new Set(t1.map(d => d.asset)).size)} assets</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Fixable By Patching</p><p class="text-2xl font-bold text-gray-900">${patchPct}%</p></div>
-                `;
-
-                const empty = (c, m) => `<tr><td colspan="${c}" class="px-4 py-8 text-center text-gray-500 italic">${m}</td></tr>`;
-                const none = 'No assets currently meet filter criteria.';
-
-                // Assets: criticality, then TruRisk
-                const topAssets = assets.slice(0, 10);
-                document.getElementById('vuln-top-assets').innerHTML = topAssets.length ? topAssets.map(t => {
-                    const isChecked = this.vulnState.selectedAssets.has(t.name);
-                    return `<tr class="cursor-pointer ${isChecked ? 'bg-blue-50/60' : 'even:bg-gray-50 hover:bg-blue-50 transition'}" data-n="${esc(t.name)}" onclick="app.openAssetDetail(this.dataset.n)">
-                        <td class="px-3 py-2 text-center" onclick="event.stopPropagation()"><input type="checkbox" value="${esc(t.name)}" ${isChecked ? 'checked' : ''} onchange="app.toggleVulnAsset(this.value, this.checked)" class="rounded border-gray-300"></td>
-                        <td class="px-2 py-2 font-medium text-gray-700">${esc(t.name)}</td>
-                        <td class="px-2 py-2 text-gray-600">${esc(t.owner)}</td>
-                        <td class="px-2 py-2 text-center font-mono">${t.criticality || '-'}</td>
-                        <td class="px-2 py-2">${PriorityEngine.truRiskBadge(t.truRisk)}</td>
-                        <td class="px-2 py-2 text-right font-mono">${fmtNum(t.detections)}</td>
-                        <td class="px-2 py-2 text-right font-mono ${t.t1 ? 'text-red-700 font-bold' : 'text-gray-400'}">${fmtNum(t.t1)}</td>
-                        <td class="px-2 py-2 text-right" onclick="event.stopPropagation()"><button data-n="${esc(t.name)}" onclick="app.openRiskModal([this.dataset.n], 'vuln')" class="text-amber-600 font-semibold hover:underline text-[10px] uppercase">Accept</button></td>
-                    </tr>`;
-                }).join('') : empty(8, none);
-
-                // Fix groups
                 const groups = PriorityEngine.fixGroups(dets, vd.qmap);
-                document.getElementById('vuln-top-patchable').innerHTML = groups.length ? groups.slice(0, 10).map(g => `
-                    <tr class="cursor-pointer even:bg-gray-50 hover:bg-blue-50 transition" data-q="${esc(g.qid)}" onclick="app.inspectQid(this.dataset.q)">
-                        <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title="${esc(g.title)}">${esc(g.title)}</td>
-                        <td class="px-4 py-3 text-right font-mono">${fmtNum(g.assets.size)}</td>
-                        <td class="px-4 py-3 text-center">${PriorityEngine.tierBadge(g.tier)}</td>
-                        <td class="px-4 py-3 text-right font-mono">${g.qvs || '-'}</td>
-                    </tr>`).join('') : empty(4, none);
-
-                // Teams and services: counts and the worst asset, never a sum of a per-asset score
+                const exploited = groups.filter(g => g.exploited).sort((x, y) => y.assets.size - x.assets.size || y.qvs - x.qvs);
                 const roll = (keyFn) => {
                     const m = new Map();
                     assets.forEach(a => {
@@ -2212,33 +2204,146 @@
                         const e = m.get(k);
                         e.count++; e.maxTru = Math.max(e.maxTru, a.truRisk); e.t1 += a.t1; e.detections += a.detections;
                     });
-                    return [...m.values()].sort((x, y) => y.t1 - x.t1 || y.maxTru - x.maxTru).slice(0, 10);
+                    return [...m.values()].sort((x, y) => y.t1 - x.t1 || y.maxTru - x.maxTru);
                 };
-                const rollRows = (list) => list.length ? list.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${esc(t.key)}</td><td class="px-4 py-3 text-gray-600">${fmtNum(t.count)} assets</td><td class="px-4 py-3">${PriorityEngine.truRiskBadge(t.maxTru)}</td><td class="px-4 py-3 text-right font-mono ${t.t1 ? 'text-red-700 font-bold' : 'text-gray-400'}">${fmtNum(t.t1)}</td></tr>`).join('') : empty(4, none);
-                document.getElementById('vuln-top-teams').innerHTML = rollRows(roll(a => a.owner));
-                document.getElementById('vuln-top-services').innerHTML = rollRows(roll(a => a.service));
+                this.vulnData = { assets, groups, exploited, teams: roll(a => a.owner), services: roll(a => a.service) };
 
-                // Known-exploited
-                const exploited = groups.filter(g => g.exploited).sort((x, y) => y.assets.size - x.assets.size || y.qvs - x.qvs).slice(0, 15);
-                document.getElementById('vuln-top-cves').innerHTML = exploited.length ? exploited.map(g => `
-                    <tr class="cursor-pointer even:bg-gray-50 hover:bg-blue-50 transition" data-q="${esc(g.qid)}" onclick="app.inspectQid(this.dataset.q)">
-                        <td class="px-4 py-3 font-mono text-xs text-blue-700 font-semibold">${esc(g.cve || 'QID ' + g.qid)}</td>
-                        <td class="px-4 py-3 text-sm truncate max-w-sm text-gray-700" title="${esc(g.title)}">${esc(g.title)}</td>
-                        <td class="px-4 py-3 text-right font-mono">${fmtNum(g.assets.size)}</td>
-                        <td class="px-4 py-3 text-right font-mono font-semibold">${g.qvs || '-'}</td>
-                    </tr>`).join('') : empty(4, 'No known-exploited vulnerabilities in the current selection.');
+                // KPI tiles: two jump to a tab, two toggle a filter
+                const t1 = dets.filter(d => d.tier === 1);
+                const patchPct = dets.length ? Math.round(dets.filter(d => d.patchable).length / dets.length * 100) : 0;
+                const tile = (label, value, sub, action, active, cls, hint) => `<button onclick="${action}" title="${hint}" class="text-left p-4 rounded border shadow-sm transition hover:shadow ${cls} ${active ? 'ring-2 ring-blue-500' : ''}">
+                        <p class="text-xs uppercase font-semibold opacity-70 flex justify-between"><span>${label}</span>${active ? '<span class="text-blue-700 normal-case">filtered ✕</span>' : ''}</p>
+                        <p class="text-2xl font-bold">${value}</p><p class="text-[11px] opacity-70">${sub}</p></button>`;
+                $('vuln-summary-metrics').innerHTML =
+                    tile('Assets with findings', fmtNum(assets.length), 'show assets', "app.vulnTab('assets')", false, 'bg-white text-gray-900', 'Go to the Assets tab') +
+                    tile('Distinct detections', fmtNum(dets.length), `${fmtNum(groups.length)} fixes: show fixes`, "app.vulnTab('fixes')", false, 'bg-white text-gray-900', 'Go to the Fixes tab') +
+                    tile('Fix now (exploited)', fmtNum(t1.length), `on ${fmtNum(new Set(t1.map(d => d.asset)).size)} assets: click to filter`, "app.vulnToggleFilter('tier','1')", f.tier === '1', 'bg-red-50 border-red-200 text-red-800', 'Show only known-exploited detections') +
+                    tile('Fixable by patching', patchPct + '%', 'click to filter to patchable', "app.vulnToggleFilter('patchable','YES')", f.patchable === 'YES', 'bg-white text-gray-900', 'Show only detections a patch can fix');
+                this.renderVulnTabs();
+            }
+
+            renderVulnTabs() {
+                const d = this.vulnData, st = this.vulnState;
+                if (!d) return;
+                const tabs = [['assets', 'Assets', d.assets.length], ['fixes', 'Fixes', d.groups.length], ['exploited', 'Known exploited', d.exploited.length], ['groups', 'Teams & services', d.teams.length + d.services.length]];
+                document.getElementById('vuln-tabs').innerHTML = tabs.map(([id, label, n]) => `<button role="tab" aria-selected="${st.tab === id}" onclick="app.vulnTab('${id}')" class="px-4 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${st.tab === id ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-gray-600 hover:text-gray-900'}">${label} <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${st.tab === id ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}">${fmtNum(n)}</span></button>`).join('');
+                const body = document.getElementById('vuln-tab-body');
+                if (st.tab === 'groups') { body.innerHTML = this.vulnGroupsHTML(); return; }
+                const T = st.tables[st.tab];
+                const sizes = ['10', '25', '50', 'all'];
+                body.innerHTML = `<div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b bg-gray-50">
+                        <input type="search" value="${esc(T.q)}" placeholder="${st.tab === 'assets' ? 'Search asset, owner or service' : 'Search title, CVE or QID'}" oninput="app.vulnSearch(this.value)" class="border border-gray-300 rounded px-3 py-1.5 text-sm w-72">
+                        <label class="text-xs text-gray-500">Rows <select onchange="app.vulnPageSize(this.value)" class="border-gray-300 rounded text-sm ml-1">${sizes.map(s => `<option value="${s}"${String(T.size) === s ? ' selected' : ''}>${s === 'all' ? 'All' : s}</option>`).join('')}</select></label>
+                        ${st.tab === 'assets' ? '<button id="vuln-bulk-btn" onclick="app.openBulkRiskModal(\'vuln\')" class="ml-auto text-xs bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1.5 rounded shadow-sm hover:bg-amber-200"></button>' : ''}
+                    </div><div id="vuln-table"></div>`;
+                this.renderVulnTable();
+            }
+
+            vulnSearch(v) { const T = this.vulnState.tables[this.vulnState.tab]; T.q = v; T.page = 0; this.renderVulnTable(); }
+            vulnPageSize(v) { const T = this.vulnState.tables[this.vulnState.tab]; T.size = v; T.page = 0; this.renderVulnTable(); }
+            vulnPage(delta) { this.vulnState.tables[this.vulnState.tab].page += delta; this.renderVulnTable(); }
+            vulnSort(key, firstDir) {
+                const T = this.vulnState.tables[this.vulnState.tab];
+                T.dir = T.key === key ? -T.dir : firstDir;
+                T.key = key; T.page = 0;
+                this.renderVulnTable();
+            }
+
+            // Column sets: w = width in %, num = numeric, dir = first sort direction, sort = sort value
+            vulnTabConfig(tab) {
+                const d = this.vulnData;
+                const trunc = (s) => `<span class="block truncate" title="${esc(s)}">${esc(s)}</span>`;
+                if (tab === 'assets') {
+                    return {
+                        rows: d.assets, search: (r) => `${r.name} ${r.owner} ${r.service}`, attr: (r) => `data-n="${esc(r.name)}" onclick="app.openAssetDetail(this.dataset.n)"`,
+                        rowClass: (r) => this.vulnState.selectedAssets.has(r.name) ? 'bg-blue-50' : '',
+                        cols: [
+                            { key: 'sel', w: 4, head: '<input type="checkbox" title="Select this page" onclick="event.stopPropagation()" onchange="app.toggleAllVuln(this.checked)" class="rounded border-gray-300">', cell: (r) => `<input type="checkbox" ${this.vulnState.selectedAssets.has(r.name) ? 'checked' : ''} data-n="${esc(r.name)}" onclick="event.stopPropagation()" onchange="app.toggleVulnAsset(this.dataset.n, this.checked)" class="rounded border-gray-300">` },
+                            { key: 'name', w: 21, label: 'Asset', dir: 1, sort: (r) => r.name.toLowerCase(), cell: (r) => `<span class="font-medium text-gray-800">${trunc(r.name)}</span>` },
+                            { key: 'owner', w: 9, label: 'Owner', dir: 1, sort: (r) => r.owner, cell: (r) => esc(r.owner) },
+                            { key: 'service', w: 14, label: 'Service', dir: 1, sort: (r) => r.service.toLowerCase(), cell: (r) => trunc(r.service) },
+                            { key: 'criticality', w: 6, label: 'Crit', num: true, dir: -1, align: 'center', sort: (r) => r.criticality, cell: (r) => r.criticality || '-' },
+                            { key: 'truRisk', w: 15, label: 'TruRisk', num: true, dir: -1, sort: (r) => r.truRisk, cell: (r) => PriorityEngine.truRiskBadge(r.truRisk) },
+                            { key: 'detections', w: 9, label: 'Detections', num: true, dir: -1, align: 'right', sort: (r) => r.detections, cell: (r) => fmtNum(r.detections) },
+                            { key: 't1', w: 9, label: 'Fix now', num: true, dir: -1, align: 'right', sort: (r) => r.t1, cell: (r) => `<span class="${r.t1 ? 'text-red-700 font-bold' : 'text-gray-400'}">${fmtNum(r.t1)}</span>` },
+                            { key: 'oldest', w: 8, label: 'Oldest', num: true, dir: -1, align: 'right', sort: (r) => r.oldest, cell: (r) => r.oldest + 'd' },
+                            { key: 'act', w: 5, align: 'right', cell: (r) => `<button data-n="${esc(r.name)}" onclick="event.stopPropagation(); app.openRiskModal([this.dataset.n], 'vuln')" class="text-amber-600 font-semibold hover:underline text-[10px] uppercase">Accept</button>` }
+                        ]
+                    };
+                }
+                const fixCols = (exploited) => [
+                    ...(exploited ? [{ key: 'cve', w: 16, label: 'CVE', dir: 1, sort: (r) => r.cve, cell: (r) => `<span class="font-mono text-xs text-blue-700 font-semibold">${esc(r.cve || 'QID ' + r.qid)}</span>` }] : []),
+                    { key: 'title', w: exploited ? 44 : 38, label: 'Fix', dir: 1, sort: (r) => r.title.toLowerCase(), cell: (r) => `<span class="text-gray-800">${trunc(r.title)}</span>` },
+                    { key: 'assets', w: 9, label: 'Assets', num: true, dir: -1, align: 'right', sort: (r) => r.assets.size, cell: (r) => fmtNum(r.assets.size) },
+                    ...(exploited ? [] : [{ key: 'tier', w: 12, label: 'Priority', dir: 1, align: 'center', sort: (r) => r.tier, cell: (r) => PriorityEngine.tierBadge(r.tier) }]),
+                    { key: 'qvs', w: 8, label: 'QVS', num: true, dir: -1, align: 'right', sort: (r) => r.qvs, cell: (r) => r.qvs || '-' },
+                    { key: 'maxAge', w: 9, label: 'Oldest', num: true, dir: -1, align: 'right', sort: (r) => r.maxAge, cell: (r) => r.maxAge + 'd' },
+                    { key: 'patchable', w: 8, label: 'Patch', dir: -1, align: 'center', sort: (r) => r.patchable ? 1 : 0, cell: (r) => r.patchable ? '✅' : '—' },
+                    ...(exploited ? [] : [{ key: 'cve', w: 16, label: 'CVE', dir: 1, sort: (r) => r.cve, cell: (r) => `<span class="font-mono text-xs text-blue-700">${esc(r.cve || '-')}</span>` }])
+                ];
+                return { rows: tab === 'fixes' ? d.groups : d.exploited, search: (r) => `${r.title} ${r.cve} ${r.qid}`, attr: (r) => `data-q="${esc(r.qid)}" onclick="app.inspectQid(this.dataset.q)"`, rowClass: () => '', cols: fixCols(tab === 'exploited') };
+            }
+
+            renderVulnTable() {
+                const tab = this.vulnState.tab, T = this.vulnState.tables[tab], cfg = this.vulnTabConfig(tab);
+                const q = (T.q || '').toLowerCase();
+                let rows = q ? cfg.rows.filter(r => cfg.search(r).toLowerCase().includes(q)) : cfg.rows;
+                if (T.key) {
+                    const c = cfg.cols.find(x => x.key === T.key && x.sort);
+                    if (c) rows = [...rows].sort((a, b) => { const x = c.sort(a), y = c.sort(b); return (x < y ? -1 : x > y ? 1 : 0) * T.dir; });
+                }
+                const total = rows.length;
+                const size = T.size === 'all' ? Math.max(total, 1) : +T.size;
+                const pages = Math.max(1, Math.ceil(total / size));
+                T.page = Math.max(0, Math.min(T.page, pages - 1));
+                const page = rows.slice(T.page * size, T.page * size + size);
+                this.vulnVisible = page;
+
+                const align = (c) => c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left';
+                const head = cfg.cols.map(c => {
+                    if (c.head) return `<th class="px-3 py-2 ${align(c)}">${c.head}</th>`;
+                    if (!c.sort) return `<th class="px-3 py-2"></th>`;
+                    const on = T.key === c.key;
+                    return `<th class="px-3 py-2 ${align(c)} whitespace-nowrap cursor-pointer select-none hover:text-gray-900" aria-sort="${on ? (T.dir > 0 ? 'ascending' : 'descending') : 'none'}" onclick="app.vulnSort('${c.key}', ${c.dir})">${c.label}<span class="ml-1 text-[9px] ${on ? 'text-blue-700' : 'text-gray-300'}">${on ? (T.dir > 0 ? '▲' : '▼') : '↕'}</span></th>`;
+                }).join('');
+                const body = page.length ? page.map(r => `<tr class="cursor-pointer hover:bg-blue-50 ${cfg.rowClass(r)}" ${cfg.attr(r)}>${cfg.cols.map(c => `<td class="px-3 py-2 ${align(c)} overflow-hidden">${c.cell(r)}</td>`).join('')}</tr>`).join('')
+                    : `<tr><td colspan="${cfg.cols.length}" class="px-3 py-10 text-center text-gray-500 italic">${q ? 'Nothing matches your search.' : 'No rows for the current filters.'}</td></tr>`;
+                const from = total ? T.page * size + 1 : 0, to = Math.min(total, T.page * size + size);
+                document.getElementById('vuln-table').innerHTML = `
+                    <table class="w-full table-fixed text-sm"><colgroup>${cfg.cols.map(c => `<col style="width:${c.w}%">`).join('')}</colgroup>
+                        <thead class="bg-gray-100 text-gray-600 text-xs uppercase sticky top-0 z-10 shadow-[0_1px_0_#e5e7eb]"><tr>${head}</tr></thead><tbody class="divide-y">${body}</tbody></table>
+                    <div class="flex items-center justify-between px-4 py-2 border-t bg-gray-50 text-xs text-gray-600">
+                        <span>${total ? `Showing ${fmtNum(from)}–${fmtNum(to)} of ${fmtNum(total)}` : 'No rows'}${q ? ` (filtered from ${fmtNum(cfg.rows.length)})` : ''}</span>
+                        <span class="flex items-center gap-2"><button ${T.page <= 0 ? 'disabled' : ''} onclick="app.vulnPage(-1)" class="px-2 py-1 border rounded bg-white ${T.page <= 0 ? 'opacity-40' : 'hover:bg-gray-100'}">← Prev</button>Page ${T.page + 1} of ${pages}<button ${T.page >= pages - 1 ? 'disabled' : ''} onclick="app.vulnPage(1)" class="px-2 py-1 border rounded bg-white ${T.page >= pages - 1 ? 'opacity-40' : 'hover:bg-gray-100'}">Next →</button></span></div>`;
+                this.updateVulnBulkLabel();
+            }
+
+            updateVulnBulkLabel() {
+                const b = document.getElementById('vuln-bulk-btn');
+                if (!b) return;
+                const n = this.vulnState.selectedAssets.size;
+                b.textContent = n ? `⚖️ Accept risk: ${n} selected` : `⚖️ Accept risk: all ${fmtNum(this.vulnData ? this.vulnData.assets.length : 0)} filtered`;
+            }
+
+            vulnGroupsHTML() {
+                const d = this.vulnData;
+                const table = (title, rows) => `<div><h4 class="px-4 py-2 font-semibold text-sm text-gray-700 bg-gray-50 border-y">${title}</h4>
+                    <table class="w-full table-fixed text-sm"><colgroup><col style="width:38%"><col style="width:16%"><col style="width:28%"><col style="width:18%"></colgroup>
+                    <thead class="text-gray-500 text-xs uppercase"><tr><th class="px-3 py-2 text-left">${title.startsWith('Teams') ? 'Team' : 'Service'}</th><th class="px-3 py-2 text-right">Assets</th><th class="px-3 py-2 text-left">Highest TruRisk</th><th class="px-3 py-2 text-right">Fix now</th></tr></thead>
+                    <tbody class="divide-y">${rows.length ? rows.map(t => `<tr class="hover:bg-blue-50"><td class="px-3 py-2 font-medium text-gray-800 truncate" title="${esc(t.key)}">${esc(t.key)}</td><td class="px-3 py-2 text-right font-mono">${fmtNum(t.count)}</td><td class="px-3 py-2">${PriorityEngine.truRiskBadge(t.maxTru)}</td><td class="px-3 py-2 text-right font-mono ${t.t1 ? 'text-red-700 font-bold' : 'text-gray-400'}">${fmtNum(t.t1)}</td></tr>`).join('') : '<tr><td colspan="4" class="px-3 py-8 text-center text-gray-500 italic">No rows for the current filters.</td></tr>'}</tbody></table></div>`;
+                return `<div class="grid grid-cols-1 lg:grid-cols-2 lg:divide-x">${table('Teams', d.teams)}${table('Services', d.services)}</div>`;
             }
 
             toggleVulnAsset(name, isChecked) {
                 if (isChecked) this.vulnState.selectedAssets.add(name);
                 else this.vulnState.selectedAssets.delete(name);
-                this.renderVulnDashboard();
+                this.renderVulnTable();
             }
 
-            async toggleAllVuln(isChecked) {
-                const top = (await this.getVulnFilteredAssets()).slice(0, 10); // checkbox only covers the 10 visible rows
-                top.forEach(a => isChecked ? this.vulnState.selectedAssets.add(a.name) : this.vulnState.selectedAssets.delete(a.name));
-                this.renderVulnDashboard();
+            // Header checkbox: select or clear every row on the page being shown
+            toggleAllVuln(isChecked) {
+                (this.vulnVisible || []).forEach(a => isChecked ? this.vulnState.selectedAssets.add(a.name) : this.vulnState.selectedAssets.delete(a.name));
+                this.renderVulnTable();
             }
 
             async getVulnFilteredAssets() {
@@ -2673,6 +2778,8 @@
             // ------------------------------------------
             // AI remediation
             // ------------------------------------------
+
+            static VULN_DEFAULT_FILTERS = { patchable: 'ALL', severity: 'ALL', owner: 'ALL', exposure: 'ALL', riskStatus: 'Open', tier: 'ALL' };
 
             static AI_SYSTEM = `You are a senior infrastructure security engineer advising a platform operations team on remediating vulnerabilities reported by Qualys.
 Use ONLY the data supplied. Never invent CVE numbers, patch versions, KB numbers or advisories; if the vendor solution is missing or unclear, say so.
