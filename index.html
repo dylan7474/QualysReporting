@@ -45,6 +45,7 @@
             <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Team Risk Reports</button>
         </nav>
         <div class="p-4 border-t border-slate-700 print-hide">
+            <button onclick="app.openAISettings()" class="w-full bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded transition mb-2">🤖 AI Settings</button>
             <button onclick="app.exportDatabase()" class="w-full bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded transition mb-2">💾 Backup DB (JSON)</button>
             <button onclick="app.promptReset()" class="w-full bg-red-900/40 hover:bg-red-800/60 text-red-200 text-sm py-2 rounded transition border border-red-800/50">⚠️ Reset Database</button>
         </div>
@@ -65,6 +66,7 @@
             
             <!-- VIEW: DASHBOARD -->
             <section id="view-dashboard" class="view-section active space-y-6">
+                <div id="dash-coverage"></div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
                         <p class="text-sm text-gray-500 font-medium uppercase">Total Assets</p>
@@ -84,22 +86,22 @@
                     </div>
                 </div>
                 
-                <h3 class="text-lg font-semibold mt-8 mb-4">Risk Exposure Summary</h3>
+                <h3 class="text-lg font-semibold mt-8 mb-4">Vulnerability Detections by Status</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-white rounded-lg shadow p-6 border-b-4 border-red-600">
-                        <p class="text-sm text-gray-500 font-medium uppercase">Actionable Risk</p>
+                        <p class="text-sm text-gray-500 font-medium uppercase">Actionable Detections</p>
                         <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-risk-actionable">0</p>
                     </div>
                     <div class="bg-white rounded-lg shadow p-6 border-b-4 border-amber-500">
-                        <p class="text-sm text-gray-500 font-medium uppercase">Accepted Risk</p>
+                        <p class="text-sm text-gray-500 font-medium uppercase">Accepted Detections</p>
                         <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-risk-accepted">0</p>
                     </div>
                     <div class="bg-white rounded-lg shadow p-6 border-b-4 border-blue-500">
-                        <p class="text-sm text-gray-500 font-medium uppercase">Awaiting Patch</p>
+                        <p class="text-sm text-gray-500 font-medium uppercase">Awaiting Patch (detections)</p>
                         <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-risk-awaiting">0</p>
                     </div>
                     <div class="bg-white rounded-lg shadow p-6 border-b-4 border-green-500">
-                        <p class="text-sm text-gray-500 font-medium uppercase">Resolved Risk</p>
+                        <p class="text-sm text-gray-500 font-medium uppercase">Resolved (detections)</p>
                         <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-risk-resolved">0</p>
                     </div>
                 </div>
@@ -270,6 +272,7 @@
                     <h3 class="text-xl font-semibold">Vulnerability Management</h3>
                     <div class="flex space-x-2">
                         <input type="file" id="vuln-file-input" accept=".csv" class="hidden" onchange="app.importVulnData(event)">
+                        <label class="flex items-center gap-1 text-xs text-gray-600" title="Off: detections for assets in the new file replace the old ones and every other asset is kept. On: wipe all vulnerability data first."><input type="checkbox" id="vuln-import-replace" class="rounded border-gray-300"> Replace all existing data</label>
                         <label for="vuln-file-input" class="cursor-pointer bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium shadow hover:bg-slate-700">📥 Import Vuln Export</label>
                     </div>
                 </div>
@@ -285,6 +288,8 @@
                         <div class="bg-white p-2 rounded shadow-sm"><p class="text-[10px] uppercase text-gray-500">Skipped Assets</p><p id="vuln-prog-skipped" class="font-bold text-amber-600">0</p></div>
                     </div>
                 </div>
+
+                <div id="vuln-coverage"></div>
 
                 <!-- KPIs -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="vuln-summary-metrics">
@@ -304,39 +309,48 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 overflow-hidden min-h-[300px]">
                     <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
                         <div class="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-                            <h4 class="font-semibold text-gray-700 text-sm">Highest Operational Risk Assets</h4>
+                            <h4 class="font-semibold text-gray-700 text-sm">Highest Risk Assets <span class="font-normal text-gray-400">(criticality, then TruRisk)</span></h4>
                             <button onclick="app.openBulkRiskModal('vuln')" class="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-1 rounded shadow-sm hover:bg-amber-200">⚖️ Bulk Accept Risk</button>
                         </div>
                         <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-3 py-2 w-8 text-center"><input type="checkbox" id="vuln-select-all" onchange="app.toggleAllVuln(this.checked)" class="rounded border-gray-300"></th><th class="px-2 py-2">Asset</th><th class="px-2 py-2">Owner</th><th class="px-2 py-2 text-center">Sev</th><th class="px-2 py-2 text-right">Weighted Risk</th><th class="px-2 py-2 text-right">Action</th></tr></thead><tbody id="vuln-top-assets" class="divide-y"></tbody></table>
+                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-3 py-2 w-8 text-center"><input type="checkbox" id="vuln-select-all" onchange="app.toggleAllVuln(this.checked)" class="rounded border-gray-300"></th><th class="px-2 py-2">Asset</th><th class="px-2 py-2">Owner</th><th class="px-2 py-2 text-center">Crit</th><th class="px-2 py-2">TruRisk</th><th class="px-2 py-2 text-right">Detections</th><th class="px-2 py-2 text-right">Fix now</th><th class="px-2 py-2 text-right">Action</th></tr></thead><tbody id="vuln-top-assets" class="divide-y"></tbody></table>
                         </div>
                     </div>
                     <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
-                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Patching Priority Queue</h4>
+                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Fix Priority Queue <span class="font-normal text-gray-400">(by vulnerability, across assets)</span></h4>
                         <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Asset</th><th class="px-4 py-2">Owner</th><th class="px-4 py-2 text-center">Sev</th><th class="px-4 py-2 text-right">Patchable Risk</th></tr></thead><tbody id="vuln-top-patchable" class="divide-y"></tbody></table>
+                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Fix</th><th class="px-4 py-2 text-right">Assets</th><th class="px-4 py-2 text-center">Priority</th><th class="px-4 py-2 text-right">QVS</th></tr></thead><tbody id="vuln-top-patchable" class="divide-y"></tbody></table>
                         </div>
                     </div>
                     <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
-                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Top Teams By Risk</h4>
+                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Teams</h4>
                         <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Team</th><th class="px-4 py-2">Asset Count</th><th class="px-4 py-2 text-center">Sev</th><th class="px-4 py-2 text-right">Combined Risk</th></tr></thead><tbody id="vuln-top-teams" class="divide-y"></tbody></table>
+                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Team</th><th class="px-4 py-2">Assets</th><th class="px-4 py-2">Highest TruRisk</th><th class="px-4 py-2 text-right">Fix now</th></tr></thead><tbody id="vuln-top-teams" class="divide-y"></tbody></table>
                         </div>
                     </div>
                     <div class="bg-white rounded shadow border flex flex-col overflow-hidden">
-                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Highest Operational Risk Services</h4>
+                        <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Services</h4>
                         <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Service</th><th class="px-4 py-2">Asset Count</th><th class="px-4 py-2 text-center">Sev</th><th class="px-4 py-2 text-right">Weighted Risk</th></tr></thead><tbody id="vuln-top-services" class="divide-y"></tbody></table>
+                            <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">Service</th><th class="px-4 py-2">Assets</th><th class="px-4 py-2">Highest TruRisk</th><th class="px-4 py-2 text-right">Fix now</th></tr></thead><tbody id="vuln-top-services" class="divide-y"></tbody></table>
                         </div>
                     </div>
                 </div>
                 
                 <div class="bg-white rounded shadow border flex flex-col overflow-hidden h-64 shrink-0">
-                    <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Highest Impact Vulnerabilities</h4>
+                    <h4 class="bg-gray-50 px-4 py-2 border-b font-semibold text-gray-700 text-sm">Known-Exploited Vulnerabilities <span class="font-normal text-gray-400">(CISA KEV, active attacks, ransomware, wormable, zero-day)</span></h4>
                     <div class="overflow-auto flex-1">
-                        <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">CVE</th><th class="px-4 py-2">Title</th><th class="px-4 py-2 text-center">Sev</th><th class="px-4 py-2 text-right">Weighted Impact</th></tr></thead><tbody id="vuln-top-cves" class="divide-y"></tbody></table>
+                        <table class="min-w-full text-left text-sm whitespace-nowrap"><thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-4 py-2">CVE</th><th class="px-4 py-2">Title</th><th class="px-4 py-2 text-right">Assets</th><th class="px-4 py-2 text-right">QVS</th></tr></thead><tbody id="vuln-top-cves" class="divide-y"></tbody></table>
                     </div>
                 </div>
+            </section>
+
+            <!-- VIEW: INSPECT (asset / vulnerability drill-down) -->
+            <section id="view-inspect" class="view-section space-y-4">
+                <div class="flex items-center gap-3 print-hide">
+                    <button onclick="app.inspectBack()" class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm font-medium hover:bg-gray-50 shadow-sm">← Back</button>
+                    <nav id="inspect-crumbs" class="text-sm"></nav>
+                </div>
+                <div id="inspect-body" class="space-y-4"></div>
             </section>
 
             <!-- VIEW: DATA HEALTH -->
@@ -378,6 +392,8 @@
                         </div>
                     </div>
 
+                    <div id="rpt-coverage" class="mb-6"></div>
+
                     <!-- 1. Executive Summary -->
                     <div class="mb-8">
                         <h3 class="text-xl font-bold text-slate-800 border-b pb-2 mb-4">1. Executive Summary</h3>
@@ -392,16 +408,16 @@
                             <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">2. Top Risk Services</h3>
                             <table class="min-w-full text-sm text-left">
                                 <thead class="text-gray-500 bg-gray-50 border-b">
-                                    <tr><th class="py-2 px-2 font-semibold">Service</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Weighted Risk</th></tr>
+                                    <tr><th class="py-2 px-2 font-semibold">Service</th><th class="py-2 px-2 font-semibold text-right">Assets</th><th class="py-2 px-2 font-semibold">Highest TruRisk</th><th class="py-2 px-2 font-semibold text-right">Fix now</th></tr>
                                 </thead>
                                 <tbody id="rpt-svc-risk" class="divide-y"></tbody>
                             </table>
                         </div>
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">3. Highest Risk Assets</h3>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">3. Highest Risk Assets <span class="text-xs font-normal text-gray-400">criticality, then TruRisk</span></h3>
                             <table class="min-w-full text-sm text-left">
                                 <thead class="text-gray-500 bg-gray-50 border-b">
-                                    <tr><th class="py-2 px-2 font-semibold">Asset</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Weighted Risk</th></tr>
+                                    <tr><th class="py-2 px-2 font-semibold">Asset</th><th class="py-2 px-2 font-semibold text-center">Crit</th><th class="py-2 px-2 font-semibold">TruRisk</th><th class="py-2 px-2 font-semibold text-right">Detections</th><th class="py-2 px-2 font-semibold text-right">Fix now</th></tr>
                                 </thead>
                                 <tbody id="rpt-top-assets" class="divide-y"></tbody>
                             </table>
@@ -411,10 +427,10 @@
                     <!-- 4 & 5: Patching & Health -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">4. Patching Priority Queue</h3>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">4. Fix Priority Queue</h3>
                             <table class="min-w-full text-sm text-left">
                                 <thead class="text-gray-500 bg-gray-50 border-b">
-                                    <tr><th class="py-2 px-2 font-semibold">Asset</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Patchable Risk</th></tr>
+                                    <tr><th class="py-2 px-2 font-semibold">Fix</th><th class="py-2 px-2 font-semibold text-right">Assets</th><th class="py-2 px-2 font-semibold text-center">Priority</th><th class="py-2 px-2 font-semibold text-center">Patch</th></tr>
                                 </thead>
                                 <tbody id="rpt-patch-priority" class="divide-y"></tbody>
                             </table>
@@ -430,6 +446,19 @@
                         <h3 class="text-lg font-bold text-blue-900 border-b border-blue-200 pb-2 mb-4">6. Recommended Actions Next 30 Days</h3>
                         <ul id="rpt-actions" class="list-disc pl-5 space-y-3 text-sm text-blue-800"></ul>
                     </div>
+
+                    <!-- 7: AI plan -->
+                    <div class="mt-8 border rounded-lg p-6">
+                        <div class="flex justify-between items-center border-b pb-2 mb-4">
+                            <h3 class="text-lg font-bold text-slate-800">7. AI Remediation Plan</h3>
+                            <span class="flex gap-2 print-hide">
+                                <button onclick="app.runAI('report')" class="bg-blue-600 text-white px-3 py-1 text-xs rounded hover:bg-blue-700 shadow-sm font-medium">Generate</button>
+                                <button onclick="app.runAI('report', null, true)" title="Ask again" class="bg-white text-blue-700 border border-blue-300 px-2 py-1 text-xs rounded hover:bg-blue-100">↻</button>
+                            </span>
+                        </div>
+                        <div id="rpt-ai-out" class="text-sm text-gray-800"></div>
+                    </div>
+                    <p class="mt-6 text-[11px] text-gray-500"><strong>How this is scored.</strong> Assets rank by Qualys criticality (1-5), then TruRisk (0-1000; Low &lt;500, Medium 500-699, High 700-849, Critical 850+). TruRisk is one score per asset, so it is never added up across findings. Detections rank by Qualys signals: <em>Fix now</em> = CISA KEV, active attacks, ransomware, wormable or zero-day; <em>This sprint</em> = QVS 70+ or remote code execution with a public exploit; <em>Scheduled</em> = severity 5 or QVS 40+; otherwise <em>Routine</em>. Fixes are grouped by QID and ranked by priority, then assets affected × QVS.</p>
                 </div>
             </section>
 
@@ -450,7 +479,7 @@
                                      <th class="px-6 py-3">Asset</th>
                                      <th class="px-6 py-3">Owner</th>
                                      <th class="px-6 py-3">Status</th>
-                                     <th class="px-6 py-3 text-right">Accepted Risk</th>
+                                     <th class="px-6 py-3 text-right">Accepted Detections</th>
                                      <th class="px-6 py-3 text-center">Expiry</th>
                                      <th class="px-6 py-3 text-right">Actions</th>
                                  </tr>
@@ -530,61 +559,29 @@
             </div>
         </div>
 
-        <!-- NEW ASSET RISK DETAIL VIEW -->
-        <div id="modal-asset-detail" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden p-6 flex flex-col max-h-[95vh]">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 class="text-2xl font-bold text-gray-800" id="det-name">Asset Name</h3>
-                        <p class="text-sm text-gray-500 mb-1" id="det-env">Environment • Service • Exposure</p>
-                        <p class="text-xs font-semibold text-gray-700">Owner: <span id="det-owner" class="text-blue-600 font-bold"></span> <span class="mx-2 text-gray-300">|</span> Status: <span id="det-status" class="uppercase font-bold"></span></p>
-                    </div>
-                    <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-800 text-2xl font-bold">&times;</button>
+        <div id="modal-ai-settings" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="text-lg font-bold">AI Settings</h3>
+                    <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-800 text-2xl font-bold leading-none">&times;</button>
                 </div>
-                
-                <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
-                    <div class="bg-gray-50 p-2 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Findings</p><p class="font-bold text-gray-800 text-lg" id="det-total-find"></p></div>
-                    <div class="bg-red-50 border border-red-100 p-2 rounded"><p class="text-[10px] text-red-600 uppercase font-semibold">Critical Findings</p><p class="font-bold text-red-700 text-lg" id="det-crit-find"></p></div>
-                    <div class="bg-blue-50 border border-blue-100 p-2 rounded"><p class="text-[10px] text-blue-600 uppercase font-semibold">Patchable Findings</p><p class="font-bold text-blue-700 text-lg" id="det-patch-find"></p></div>
-                    <div class="bg-gray-50 p-2 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Risk</p><p class="font-bold text-gray-800 text-lg" id="det-total-risk"></p></div>
-                    <div class="bg-emerald-50 border border-emerald-200 p-2 rounded"><p class="text-[10px] text-emerald-600 uppercase font-semibold">Patchable Risk</p><p class="font-bold text-emerald-800 text-lg" id="det-patch-risk"></p></div>
-                    <div class="bg-amber-50 border border-amber-200 p-2 rounded"><p class="text-[10px] text-amber-600 uppercase font-semibold">Actionable Risk</p><p class="font-bold text-amber-800 text-lg" id="det-actionable"></p></div>
+                <div class="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3 mb-4">
+                    AI plans send vulnerability titles, CVEs, vendor solutions and asset roles to the provider you choose below. Pick a local model (an OpenAI-compatible server such as Ollama) if that data must stay in-house. The key is kept in this browser only and is not part of the backup.
                 </div>
-
-                <div class="flex-1 overflow-hidden flex flex-col border rounded mb-4 min-h-[250px]">
-                    <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-                        <span class="font-semibold text-sm text-gray-700">Correlated Vulnerabilities</span>
-                    </div>
-                    <div class="overflow-y-auto flex-1">
-                        <table class="min-w-full text-left text-sm whitespace-nowrap">
-                            <thead class="bg-gray-50 text-gray-600 border-b sticky top-0">
-                                <tr>
-                                    <th class="px-3 py-2 text-center">Sev</th>
-                                    <th class="px-3 py-2">QID</th>
-                                    <th class="px-3 py-2">CVE</th>
-                                    <th class="px-3 py-2 w-full">Title</th>
-                                    <th class="px-3 py-2 text-center">Patchable</th>
-                                    <th class="px-3 py-2">Age</th>
-                                    <th class="px-3 py-2 text-right">TruRisk</th>
-                                </tr>
-                            </thead>
-                            <tbody id="det-vulns-tbody" class="divide-y"></tbody>
-                        </table>
-                    </div>
+                <div class="space-y-3 text-sm">
+                    <div><label class="block font-medium mb-1">Provider</label>
+                        <select id="ai-provider" onchange="app.aiProviderChanged()" class="w-full border rounded p-2"><option value="anthropic">Anthropic Claude</option><option value="gemini">Google Gemini</option><option value="openai">OpenAI-compatible (e.g. Ollama)</option></select></div>
+                    <div id="ai-baseurl-row" class="hidden"><label class="block font-medium mb-1">Base URL</label>
+                        <input id="ai-baseurl" class="w-full border rounded p-2" placeholder="http://localhost:11434/v1"></div>
+                    <div><label class="block font-medium mb-1">Model</label><input id="ai-model" class="w-full border rounded p-2" placeholder=""></div>
+                    <div><label id="ai-key-label" class="block font-medium mb-1">API key</label><input id="ai-key" type="password" autocomplete="off" class="w-full border rounded p-2"></div>
+                    <label class="flex items-start gap-2"><input id="ai-anon" type="checkbox" class="mt-1 rounded border-gray-300"><span>Replace hostnames with neutral aliases before sending (IP addresses are never sent)</span></label>
                 </div>
-
-                <div class="grid grid-cols-3 gap-4 border-t pt-4 shrink-0">
-                    <div class="col-span-2 bg-blue-50 border border-blue-200 rounded p-4 relative">
-                        <h4 class="font-semibold text-blue-900 text-sm mb-3 flex justify-between items-center">
-                            Remediation Advice 
-                            <button onclick="app.generateRemediationAdvice()" class="bg-blue-600 text-white px-3 py-1 text-xs rounded hover:bg-blue-700 shadow-sm font-medium transition">Generate Advice</button>
-                        </h4>
-                        <div id="det-advice-content" class="text-sm text-blue-800 space-y-2 italic">Click generate to analyze findings and calculate estimated risk reduction.</div>
-                    </div>
-                    <div class="flex flex-col space-y-2 justify-center">
-                        <button onclick="app.openRiskModal([document.getElementById('det-name').textContent])" class="w-full bg-amber-100 text-amber-800 border border-amber-300 py-3 rounded text-sm font-bold hover:bg-amber-200 shadow-sm transition">⚖️ Accept Risk</button>
-                        <button onclick="app.closeModals()" class="w-full bg-gray-100 text-gray-800 border py-3 rounded text-sm font-bold hover:bg-gray-200 shadow-sm transition">Close View</button>
-                    </div>
+                <p id="ai-test-result" class="text-xs mt-2"></p>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button onclick="app.testAISettings()" class="px-4 py-2 border rounded text-sm hover:bg-gray-50">Test</button>
+                    <button onclick="app.closeModals()" class="px-4 py-2 border rounded text-sm hover:bg-gray-50">Cancel</button>
+                    <button onclick="app.saveAISettings()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700">Save</button>
                 </div>
             </div>
         </div>
@@ -633,6 +630,7 @@
                 VULN_SERVICE_SUMMARY: 'gov_vuln_service_summary',
                 VULN_CVE_SUMMARY: 'gov_vuln_cve_summary',
                 VULN_DETAILS: 'gov_vuln_details',
+                VULN_META: 'gov_vuln_meta',
                 RISK_ACCEPTANCES: 'gov_risk_acceptances'
             };
 
@@ -645,7 +643,9 @@
                 localStorage.setItem(key, JSON.stringify(data));
             }
 
-            static exportDatabase() {
+            static async exportDatabase() {
+                let vulnStore = { detections: [], qids: [] };
+                try { vulnStore = { detections: await VulnStore.all('detections'), qids: await VulnStore.all('qids') }; } catch (e) { console.error('[Backup] vulnerability store', e); }
                 const db = {
                     assetRegister: this.load(this.KEYS.ASSET_REGISTER),
                     reviewQueue: this.load(this.KEYS.REVIEW_QUEUE),
@@ -655,9 +655,11 @@
                     vulnServiceSummary: this.load(this.KEYS.VULN_SERVICE_SUMMARY),
                     vulnCveSummary: this.load(this.KEYS.VULN_CVE_SUMMARY),
                     vulnDetails: this.load(this.KEYS.VULN_DETAILS),
+                    vulnMeta: this.load(this.KEYS.VULN_META),
+                    vulnStore,
                     riskAcceptances: this.load(this.KEYS.RISK_ACCEPTANCES),
                     exportDate: new Date().toISOString(),
-                    version: '2.6'
+                    version: '2.7'
                 };
                 const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -764,6 +766,279 @@
                     }
                 });
                 return map;
+            }
+        }
+
+        // ==========================================
+        // SHARED HELPERS
+        // ==========================================
+
+        const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const fmtNum = (n) => Math.round(n || 0).toLocaleString('en-GB');
+        const linkify = (html) => html.replace(/(https?:\/\/(?:(?!&quot;|&#39;)[^\s<>)])+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline">$1</a>');
+
+        // Minimal, escape-first Markdown renderer for AI output (headings, bold, code, bullet and numbered lists).
+        function mdToHtml(src) {
+            const inline = (t) => linkify(t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-xs">$1</code>'));
+            const out = [];
+            let list = null;
+            const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+            for (const raw of esc(src).split('\n')) {
+                const l = raw.trimEnd();
+                let m;
+                if ((m = l.match(/^#{1,4}\s+(.*)/))) { close(); out.push(`<h4 class="font-bold text-gray-900 mt-4 mb-1">${inline(m[1])}</h4>`); }
+                else if ((m = l.match(/^\s*[-*]\s+(.*)/))) { if (list !== 'ul') { close(); out.push('<ul class="list-disc pl-5 space-y-1">'); list = 'ul'; } out.push(`<li>${inline(m[1])}</li>`); }
+                else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== 'ol') { close(); out.push('<ol class="list-decimal pl-5 space-y-1">'); list = 'ol'; } out.push(`<li>${inline(m[1])}</li>`); }
+                else if (!l.trim()) close();
+                else { close(); out.push(`<p class="my-1">${inline(l)}</p>`); }
+            }
+            close();
+            return out.join('');
+        }
+
+        // ==========================================
+        // VULNERABILITY STORE (IndexedDB)
+        // localStorage cannot hold every detection, so the full detail lives here:
+        //   detections: one record per asset + QID + protocol + port (CVE rows merged)
+        //   qids:       one record per QID (title, solution, threat, CVEs, exploit flags)
+        // ==========================================
+
+        class VulnStore {
+            static DB = 'gov_portal_vuln';
+            static _db = null;
+
+            static open() {
+                if (!this._db) {
+                    this._db = new Promise((resolve, reject) => {
+                        if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB is not available in this browser.'));
+                        const rq = indexedDB.open(this.DB, 1);
+                        rq.onupgradeneeded = () => {
+                            const db = rq.result;
+                            db.createObjectStore('detections', { keyPath: 'k' }).createIndex('asset', 'asset');
+                            db.createObjectStore('qids', { keyPath: 'qid' });
+                        };
+                        rq.onsuccess = () => resolve(rq.result);
+                        rq.onerror = () => reject(rq.error);
+                    });
+                }
+                return this._db;
+            }
+
+            static done(tx) {
+                return new Promise((resolve, reject) => {
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(tx.error);
+                });
+            }
+
+            static async all(store) {
+                const db = await this.open();
+                return new Promise((resolve, reject) => {
+                    const r = db.transaction(store).objectStore(store).getAll();
+                    r.onsuccess = () => resolve(r.result);
+                    r.onerror = () => reject(r.error);
+                });
+            }
+
+            // Replace the detections of every asset in `assets` (or everything when clearAll), upsert the QID catalogue.
+            static async merge({ detections, qids, assets, clearAll }) {
+                const db = await this.open();
+                let oldKeys = [];
+                if (!clearAll && assets.length) {
+                    oldKeys = await new Promise((resolve, reject) => {
+                        const t = db.transaction('detections');
+                        const idx = t.objectStore('detections').index('asset');
+                        const out = [];
+                        assets.forEach(a => { const r = idx.getAllKeys(a); r.onsuccess = () => out.push(...r.result); });
+                        t.oncomplete = () => resolve(out);
+                        t.onerror = () => reject(t.error);
+                    });
+                }
+                const tx = db.transaction(['detections', 'qids'], 'readwrite');
+                const ds = tx.objectStore('detections'), qs = tx.objectStore('qids');
+                if (clearAll) { ds.clear(); qs.clear(); }
+                oldKeys.forEach(k => ds.delete(k));
+                detections.forEach(d => ds.put(d));
+                qids.forEach(q => qs.put(q));
+                await this.done(tx);
+            }
+
+            static async clear() {
+                const db = await this.open();
+                const tx = db.transaction(['detections', 'qids'], 'readwrite');
+                tx.objectStore('detections').clear();
+                tx.objectStore('qids').clear();
+                await this.done(tx);
+            }
+        }
+
+        // ==========================================
+        // PRIORITY ENGINE
+        // Qualys TruRisk is a per-ASSET score, so it ranks assets but must never be summed per finding.
+        // Per-detection priority comes from Qualys' own signals (QVS score, Real-Time Intelligence flags).
+        // ==========================================
+
+        class PriorityEngine {
+            static EXPLOITED = ['CISA Known Exploited Vulnerabilities', 'Active Attacks', 'Ransomware', 'Wormable', 'Zero Day'];
+            static QVS_SPRINT = 70;
+            static QVS_SCHEDULED = 40;
+            static LABELS = { 1: 'Fix now', 2: 'This sprint', 3: 'Scheduled', 4: 'Routine' };
+            static CLS = { 1: 'bg-red-100 text-red-800', 2: 'bg-orange-100 text-orange-800', 3: 'bg-amber-100 text-amber-800', 4: 'bg-gray-100 text-gray-700' };
+            static SHORT_FLAGS = {
+                'CISA Known Exploited Vulnerabilities': 'CISA KEV', 'Active Attacks': 'Active attacks', 'Ransomware': 'Ransomware',
+                'Wormable': 'Wormable', 'Zero Day': 'Zero day', 'Remote Code Execution': 'RCE', 'Public Exploit': 'Public exploit'
+            };
+
+            static isExploited(q) { return (q.rti || []).some(t => this.EXPLOITED.includes(t)); }
+
+            static tier(d, q) {
+                const rti = q.rti || [];
+                if (this.isExploited(q)) return 1;
+                if (d.qvs >= this.QVS_SPRINT || (rti.includes('Remote Code Execution') && rti.includes('Public Exploit'))) return 2;
+                if (d.sev >= 5 || d.qvs >= this.QVS_SCHEDULED) return 3;
+                return 4;
+            }
+
+            static tierBadge(t) {
+                return `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold whitespace-nowrap ${this.CLS[t]}">${this.LABELS[t]}</span>`;
+            }
+
+            // Qualys TruRisk bands: 0-499 Low, 500-699 Medium, 700-849 High, 850-1000 Critical
+            static band(score) {
+                if (score >= 850) return { label: 'Critical', cls: 'bg-red-100 text-red-800' };
+                if (score >= 700) return { label: 'High', cls: 'bg-orange-100 text-orange-800' };
+                if (score >= 500) return { label: 'Medium', cls: 'bg-amber-100 text-amber-800' };
+                if (score > 0) return { label: 'Low', cls: 'bg-green-100 text-green-800' };
+                return { label: 'n/a', cls: 'bg-gray-100 text-gray-600' };
+            }
+
+            static truRiskBadge(score) {
+                const b = this.band(score);
+                return `<span class="inline-flex items-center gap-1"><span class="font-mono font-semibold">${fmtNum(score)}</span><span class="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${b.cls}">${b.label}</span></span>`;
+            }
+
+            static sevBadge(s) {
+                const cls = s >= 5 ? 'bg-red-100 text-red-800' : (s === 4 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-700');
+                return `<span class="px-2 py-0.5 rounded text-[10px] font-bold ${cls}">${s}</span>`;
+            }
+
+            static flagChips(rti, onlyNotable = true) {
+                const list = (rti || []).filter(t => !onlyNotable || this.SHORT_FLAGS[t]);
+                return list.map(t => `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold mr-1 mb-1">${esc(this.SHORT_FLAGS[t] || t)}</span>`).join('');
+            }
+
+            static blank() { return { detections: 0, sev5: 0, sev4: 0, t1: 0, t2: 0, t3: 0, t4: 0, patchable: 0, exploited: 0, maxQvs: 0, oldest: 0 }; }
+
+            static accumulate(s, d) {
+                s.detections++;
+                if (d.sev >= 5) s.sev5++; else if (d.sev === 4) s.sev4++;
+                s['t' + d.tier]++;
+                if (d.patchable) s.patchable++;
+                if (d.exploited) s.exploited++;
+                s.maxQvs = Math.max(s.maxQvs, d.qvs);
+                s.oldest = Math.max(s.oldest, d.age);
+            }
+
+            // Assets rank by criticality first, then TruRisk (the order the Platform team agreed).
+            static sortAssets(a, b) { return (b.criticality - a.criticality) || (b.truRisk - a.truRisk) || (b.t1 - a.t1); }
+
+            // One row per QID: what to fix, how many assets it touches.
+            static fixGroups(dets, qmap) {
+                const m = new Map();
+                for (const d of dets) {
+                    const q = qmap.get(d.qid) || {};
+                    let g = m.get(d.qid);
+                    if (!g) {
+                        g = { qid: d.qid, title: q.title || ('QID ' + d.qid), tier: 4, qvs: 0, assets: new Set(), detections: 0, patchable: !!q.patchable, exploited: this.isExploited(q), maxAge: 0, cve: (q.cves && q.cves[0] && q.cves[0].id) || '' };
+                        m.set(d.qid, g);
+                    }
+                    g.tier = Math.min(g.tier, d.tier);
+                    g.qvs = Math.max(g.qvs, d.qvs);
+                    g.assets.add(d.asset);
+                    g.detections++;
+                    g.maxAge = Math.max(g.maxAge, d.age);
+                }
+                return [...m.values()].sort((a, b) => a.tier - b.tier || (b.assets.size * b.qvs) - (a.assets.size * a.qvs) || b.assets.size - a.assets.size);
+            }
+        }
+
+        // ==========================================
+        // AI SERVICE
+        // Browser-side calls only; the key lives in this browser's localStorage and is never part of a backup.
+        // ==========================================
+
+        class AIService {
+            static KEY = 'gov_ai_settings';
+            static DEFAULT_MODELS = { anthropic: 'claude-sonnet-5-5', gemini: 'gemini-2.5-flash', openai: '' };
+            static PROVIDER_LABELS = { anthropic: 'Anthropic Claude', gemini: 'Google Gemini', openai: 'OpenAI-compatible (e.g. Ollama)' };
+
+            static load() {
+                let s = {};
+                try { s = JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch (e) { /* ignore */ }
+                return { provider: 'anthropic', model: '', baseUrl: '', apiKey: '', anonymise: true, ...s };
+            }
+
+            static save(s) { localStorage.setItem(this.KEY, JSON.stringify(s)); }
+
+            static modelFor(s = this.load()) { return s.model || this.DEFAULT_MODELS[s.provider] || ''; }
+
+            static configured() {
+                const s = this.load();
+                if (s.provider === 'openai') return !!(s.baseUrl && this.modelFor(s));
+                return !!s.apiKey;
+            }
+
+            static async complete(system, user) {
+                const s = this.load();
+                const model = this.modelFor(s);
+                let url, headers = { 'Content-Type': 'application/json' }, body, pick;
+
+                if (s.provider === 'anthropic') {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = s.apiKey;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = { model, max_tokens: 2500, system, messages: [{ role: 'user', content: user }] };
+                    pick = (j) => (j.content || []).map(b => b.text || '').join('');
+                } else if (s.provider === 'gemini') {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+                    headers['x-goog-api-key'] = s.apiKey;
+                    body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }], generationConfig: { temperature: 0.2 } };
+                    pick = (j) => ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || '').join('');
+                } else {
+                    url = s.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+                    if (s.apiKey) headers['Authorization'] = 'Bearer ' + s.apiKey;
+                    body = { model, temperature: 0.2, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+                    pick = (j) => j.choices?.[0]?.message?.content || '';
+                }
+
+                let res;
+                try { res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }); }
+                catch (e) { throw new Error(`Could not reach ${new URL(url).host} (${e.message}). Check the address, CORS, and that an https page is not calling an http server.`); }
+                const raw = await res.text();
+                let json = {};
+                try { json = JSON.parse(raw); } catch (e) { /* not JSON */ }
+                if (!res.ok) throw new Error(`${res.status} ${json.error?.message || json.error || raw.slice(0, 200)}`);
+                const text = pick(json).trim();
+                if (!text) throw new Error('The model returned an empty answer.');
+                return text;
+            }
+        }
+
+        // Swaps hostnames for neutral aliases before anything leaves the browser, and swaps them back in the answer.
+        class Anonymiser {
+            constructor(enabled) { this.enabled = enabled; this.map = new Map(); }
+            alias(name) {
+                if (!this.enabled) return name;
+                if (!this.map.has(name)) this.map.set(name, 'asset-' + String(this.map.size + 1).padStart(2, '0'));
+                return this.map.get(name);
+            }
+            restore(text) {
+                if (!this.enabled) return text;
+                let out = text;
+                [...this.map.entries()].sort((a, b) => b[1].length - a[1].length).forEach(([real, alias]) => { out = out.split(alias).join(real); });
+                return out;
             }
         }
 
@@ -1026,7 +1301,14 @@
                 this.reviewState = { filters: { state: 'PENDING', owner: 'ALL', service: 'ALL', search: '' }, selectedIds: new Set(), visibleIds: [], pendingAction: null };
                 this.registerState = { editingAsset: null, deletingAsset: null, selectedAssets: new Set() };
                 this.vulnState = { filters: { patchable: 'ALL', severity: 'ALL', owner: 'ALL', exposure: 'ALL', riskStatus: 'Open' }, selectedAssets: new Set() };
-                this.raState = { selectedAssets: [], filteredAssets: [], currentDetailAsset: null };
+                this.raState = { selectedAssets: [], filteredAssets: [] };
+                this.inspectState = { stack: [], filters: { tier: 'ALL', patchable: 'ALL', q: '' } };
+                this.inspectCtx = null;
+                this.inspectReturn = 'dashboard';
+                this.currentView = null;
+                this.reportCtx = null;
+                this.aiCache = new Map();
+                this._vd = null;
             }
 
             init() {
@@ -1045,6 +1327,7 @@
                 }
                 
                 target.classList.add('active');
+                this.currentView = viewId;
                 
                 if (viewId === 'dashboard') this.renderDashboard();
                 if (viewId === 'review') this.renderReviewQueue();
@@ -1065,6 +1348,7 @@
             renderDashboard() {
                 const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 const queue = ReviewQueueService.getQueue().filter(x => x.status === 'PENDING' || x.status === 'IN_REVIEW');
+                document.getElementById('dash-coverage').innerHTML = this.coverageHTML('ALL');
                 document.getElementById('kpi-total-assets').textContent = register.length;
                 document.getElementById('kpi-platform-assets').textContent = register.filter(r => r.owner === 'Platform').length;
                 document.getElementById('kpi-pending-review').textContent = queue.length;
@@ -1076,10 +1360,11 @@
                 
                 vulnSum.forEach(v => {
                     const stat = v.riskStatus || 'Open';
-                    if (stat === 'Risk Accepted') accepted += v.riskTotal;
-                    else if (stat === 'Awaiting Patch') awaiting += v.riskTotal;
-                    else if (stat === 'Resolved') resolved += v.riskTotal;
-                    else actionable += v.riskTotal;
+                    const n = v.detections || 0;
+                    if (stat === 'Risk Accepted') accepted += n;
+                    else if (stat === 'Awaiting Patch') awaiting += n;
+                    else if (stat === 'Resolved') resolved += n;
+                    else actionable += n;
                 });
 
                 const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -1321,7 +1606,7 @@
 
             exportDatabase() { StorageService.exportDatabase(); }
             promptReset() { document.getElementById('modal-reset-confirm').classList.remove('hidden'); }
-            executeReset() { StorageService.clearAll(); window.location.reload(); }
+            executeReset() { StorageService.clearAll(); VulnStore.clear().catch(() => {}).finally(() => window.location.reload()); }
 
             updateVulnFilters() {
                 this.vulnState.filters = {
@@ -1334,267 +1619,345 @@
                 this.renderVulnDashboard();
             }
 
+            // ------------------------------------------
+            // Vulnerability data access
+            // ------------------------------------------
+
+            invalidateVulnData() { this._vd = null; }
+
+            async getVulnData() {
+                if (this._vd) return this._vd;
+                let dets = [], qs = [];
+                try { [dets, qs] = await Promise.all([VulnStore.all('detections'), VulnStore.all('qids')]); }
+                catch (e) { console.error('[Vuln Store]', e); }
+                const qmap = new Map(qs.map(q => [q.qid, q]));
+                const byAsset = new Map(), byQid = new Map();
+                dets.forEach(d => {
+                    const q = qmap.get(d.qid) || {};
+                    d.tier = PriorityEngine.tier(d, q);
+                    d.exploited = PriorityEngine.isExploited(q);
+                    if (!byAsset.has(d.asset)) byAsset.set(d.asset, []);
+                    byAsset.get(d.asset).push(d);
+                    if (!byQid.has(d.qid)) byQid.set(d.qid, []);
+                    byQid.get(d.qid).push(d);
+                });
+                this._vd = { dets, qmap, byAsset, byQid };
+                return this._vd;
+            }
+
+            loadVulnMeta() {
+                const m = StorageService.load(StorageService.KEYS.VULN_META);
+                return (m && !Array.isArray(m)) ? m : { imports: [], truncated: false };
+            }
+
+            // Registered assets in scope joined to their detections, with the filters applied at detection level.
+            async scopedData({ owner = 'ALL', exposure = 'ALL', riskStatus = 'ALL', patchable = 'ALL', severity = 'ALL' } = {}) {
+                const vd = await this.getVulnData();
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const regMap = new Map(reg.map(r => [r.normalizedName, r]));
+                const sums = new Map((StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).map(s => [s.name, s]));
+                const inScope = reg.filter(r => (owner === 'ALL' || r.owner === owner)
+                    && (exposure === 'ALL' || (r.exposure || 'Unknown') === exposure)
+                    && (riskStatus === 'ALL' || (r.riskStatus || 'Open') === riskStatus));
+                const names = new Set(inScope.map(r => r.normalizedName));
+                const dets = [];
+                const stats = new Map();
+                for (const [name, list] of vd.byAsset) {
+                    if (!names.has(name)) continue;
+                    for (const d of list) {
+                        if (patchable === 'YES' && !d.patchable) continue;
+                        if (severity === '5' && d.sev < 5) continue;
+                        if (severity === '4+' && d.sev < 4) continue;
+                        dets.push(d);
+                        if (!stats.has(name)) stats.set(name, PriorityEngine.blank());
+                        PriorityEngine.accumulate(stats.get(name), d);
+                    }
+                }
+                const assets = [...stats].map(([name, s]) => {
+                    const r = regMap.get(name) || {}, sum = sums.get(name) || {};
+                    return { name, ...s, owner: r.owner || 'Unknown', service: r.service || 'Unclassified', exposure: r.exposure || 'Unknown', riskStatus: r.riskStatus || 'Open', criticality: sum.criticality || 0, truRisk: sum.truRisk || 0 };
+                }).sort(PriorityEngine.sortAssets);
+                return { vd, inScope, dets, assets, regMap };
+            }
+
+            // Per-asset rollup kept in localStorage so the dashboard and risk register can read it synchronously.
+            buildAssetSummaries(detArr, qmap, assetInfo, regByNorm) {
+                const by = new Map();
+                detArr.forEach(d => {
+                    const q = qmap.get(d.qid) || {};
+                    d.tier = PriorityEngine.tier(d, q);
+                    d.exploited = PriorityEngine.isExploited(q);
+                    let s = by.get(d.asset);
+                    if (!s) {
+                        const info = assetInfo.get(d.asset) || {}, r = regByNorm[d.asset] || {};
+                        s = { ...PriorityEngine.blank(), assetId: info.assetId, name: d.asset, owner: r.owner, service: r.service || 'Unclassified', exposure: r.exposure, riskStatus: r.riskStatus || 'Open', truRisk: info.truRisk || 0, criticality: info.criticality || 0 };
+                        by.set(d.asset, s);
+                    }
+                    PriorityEngine.accumulate(s, d);
+                });
+                return [...by.values()];
+            }
+
+            // ------------------------------------------
+            // Coverage banner: says how much of the estate the vulnerability data actually describes
+            // ------------------------------------------
+
+            coverageHTML(scope = 'ALL', riskStatus = 'ALL') {
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER)
+                    .filter(r => (scope === 'ALL' || r.owner === scope) && (riskStatus === 'ALL' || (r.riskStatus || 'Open') === riskStatus));
+                const sums = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
+                const have = new Set(sums.map(s => s.name));
+                const meta = this.loadVulnMeta();
+                const box = (cls, inner) => `<div class="rounded-lg border p-4 text-sm ${cls}">${inner}</div>`;
+                const scopeLabel = scope === 'ALL' ? 'registered' : scope;
+
+                if (!meta.imports.length) {
+                    return sums.length
+                        ? box('bg-amber-50 border-amber-300 text-amber-900', '<strong>Vulnerability data was imported by an older version of this portal.</strong> Re-import the vulnerability export to enable per-asset drill-down and the new scoring.')
+                        : box('bg-gray-50 border-gray-200 text-gray-700', '<strong>No vulnerability export imported yet.</strong> Import one from Vuln Management to see risk figures.');
+                }
+
+                const withData = reg.filter(r => have.has(r.normalizedName));
+                const without = reg.filter(r => !have.has(r.normalizedName));
+                const pct = reg.length ? Math.round(withData.length / reg.length * 100) : 0;
+                const truncated = meta.imports.filter(i => i.truncated);
+                const ok = !truncated.length && pct === 100;
+                const skipped = meta.imports.reduce((n, i) => n + (i.skippedCount || 0), 0);
+
+                let html = `<div class="flex items-start gap-3"><div class="text-xl leading-none">${ok ? '✅' : '⚠️'}</div><div class="flex-1 space-y-1.5">`;
+                html += `<p><strong>Vulnerability data covers ${fmtNum(withData.length)} of ${fmtNum(reg.length)} ${esc(scopeLabel)} assets (${pct}%).</strong></p>`;
+                truncated.forEach(i => {
+                    const parts = [];
+                    if (i.detTotal) parts.push(`${fmtNum(i.detDown)} of ${fmtNum(i.detTotal)} detections`);
+                    if (i.cveTotal) parts.push(`${fmtNum(i.cveDown)} of ${fmtNum(i.cveTotal)} CVEs`);
+                    html += `<p><strong>Qualys truncated ${esc(i.file)}</strong>${parts.length ? ': only ' + parts.join(' and ') + ' were downloaded' : ''}. An asset with no findings here may simply be missing from the file, so its risk is <em>unknown</em>, not zero. Export in smaller batches (by tag or asset group) and import each one; imports merge.</p>`;
+                });
+                if (without.length && !truncated.length) html += `<p>${fmtNum(without.length)} ${esc(scopeLabel)} assets have no findings in the imported data.</p>`;
+                if (skipped) html += `<p class="text-xs opacity-80">${fmtNum(skipped)} asset${skipped === 1 ? '' : 's'} in the export are not in the Asset Register and were left out.</p>`;
+                html += `<p class="text-xs opacity-80">Sources: ${meta.imports.map(i => `${esc(i.file)} (${new Date(i.at).toLocaleDateString('en-GB')})`).join('; ')}</p>`;
+                if (without.length) {
+                    html += `<details class="print-hide text-xs"><summary class="cursor-pointer font-semibold">Assets with no vulnerability data (${fmtNum(without.length)})</summary><div class="mt-1 max-h-40 overflow-auto font-mono leading-5">${without.slice(0, 400).map(r => esc(r.normalizedName)).join(', ')}${without.length > 400 ? ` … and ${without.length - 400} more` : ''}</div></details>`;
+                }
+                html += '</div></div>';
+                return box(ok ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-900', html);
+            }
+
+            // ------------------------------------------
+            // Vulnerability import
+            // ------------------------------------------
+
             importVulnData(event) {
                 const file = event.target.files[0];
                 if (!file) return;
+                const $ = (id) => document.getElementById(id);
+                const replace = !!$('vuln-import-replace')?.checked;
 
-                document.getElementById('vuln-import-progress').classList.remove('hidden');
-                document.getElementById('vuln-header-info').textContent = "Scanning for header...";
-                
-                let rowsProcessed = 0, findingsAggregated = 0;
-                const uniqueAssetsMatched = new Set();
-                const uniqueAssetsSkipped = new Set();
-                
+                $('vuln-import-progress').classList.remove('hidden');
+                $('vuln-header-info').textContent = 'Scanning for header...';
+                ['vuln-prog-rows', 'vuln-prog-agg', 'vuln-prog-matched', 'vuln-prog-skipped'].forEach(i => { $(i).textContent = '0'; });
+
                 const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                const regByAssetId = {};
-                const regByNormName = {};
-                reg.forEach(r => {
-                    if (r.assetId) regByAssetId[r.assetId] = r;
-                    regByNormName[r.normalizedName] = r;
-                });
+                const regByAssetId = {}, regByNormName = {};
+                reg.forEach(r => { if (r.assetId) regByAssetId[r.assetId] = r; regByNormName[r.normalizedName] = r; });
 
-                const assetSummary = {};
-                const serviceSummary = {};
-                const cveSummary = {};
+                const notes = [];
+                const dets = new Map(), qids = new Map(), qidCves = new Map(), assetInfo = new Map();
+                const matched = new Set(), skipped = new Set();
+                let ci = null, scanIndex = 0, rowsProcessed = 0, rowsCorrelated = 0;
+                const clean = (v) => { v = String(v ?? '').trim(); return v === "'-" ? '' : v; };
 
-                let headerFound = false;
-                let headerRow = [];
-                let headerRowIndex = -1;
-                let scanIndex = 0;
-
-                Papa.parse(file, { 
-                    header: false, 
-                    skipEmptyLines: true, 
+                Papa.parse(file, {
+                    header: false,
+                    skipEmptyLines: true,
                     step: (results) => {
                         scanIndex++;
-                        const rawRow = results.data;
+                        const row = results.data;
 
-                        if (!headerFound) {
-                            if (scanIndex <= 50) {
-                                const rowStr = rawRow.map(String).map(s => s.toLowerCase().trim());
-                                if (rowStr.some(c => c === 'qid') && rowStr.some(c => c.includes('severity')) && rowStr.some(c => c.includes('asset'))) {
-                                    headerFound = true;
-                                    headerRow = rawRow;
-                                    headerRowIndex = scanIndex;
-                                    document.getElementById('vuln-header-info').textContent = `Detected Vulnerability Header Row: ${headerRowIndex}`;
-                                }
+                        if (!ci) {
+                            if (scanIndex > 60) return;
+                            const lc = row.map(c => String(c).toLowerCase().trim());
+                            if (lc.includes('qid') && lc.some(c => c.includes('severity')) && lc.some(c => c.includes('asset'))) {
+                                ci = {};
+                                lc.forEach((h, i) => { if (!(h in ci)) ci[h] = i; });
+                                $('vuln-header-info').textContent = `Detected Vulnerability Header Row: ${scanIndex}`;
+                            } else if (row[0] && String(row[0]).trim()) {
+                                notes.push(String(row[0]).trim());
                             }
-                            return; // Skip metadata rows and the header row itself
+                            return;
                         }
 
                         rowsProcessed++;
-                        if (rowsProcessed % 1000 === 0) {
-                            document.getElementById('vuln-prog-rows').textContent = rowsProcessed;
-                        }
-                        
-                        // Map the streamed array to an object using our detected header
-                        const r = {};
-                        headerRow.forEach((h, i) => {
-                            r[h] = rawRow[i];
-                        });
+                        if (rowsProcessed % 2000 === 0) $('vuln-prog-rows').textContent = rowsProcessed;
 
-                        const safeGet = (keys) => {
-                            for (let k of keys) {
-                                let found = Object.keys(r).find(key => key.toLowerCase().trim() === k.toLowerCase());
-                                if (found) return r[found];
-                            }
-                            return '';
-                        };
+                        const g = (name) => { const i = ci[name]; return i === undefined ? '' : clean(row[i]); };
+                        const assetId = g('asset id');
+                        const rawName = g('asset name');
+                        const norm = AssetIdentityService.normalize(rawName);
+                        let a = assetId ? regByAssetId[assetId] : null;
+                        if (!a && norm !== 'unknown-asset') a = regByNormName[norm];
+                        if (!a) { skipped.add(rawName || assetId); return; }
+                        if (g('ignored').toLowerCase() === 'yes' || g('disabled').toLowerCase() === 'yes') return;
 
-                        const vAssetId = safeGet(['Asset Id', 'Asset ID', 'ID']);
-                        const vHostName = safeGet(['Asset Name', 'Hostname']);
-                        const normName = AssetIdentityService.normalize(vHostName);
-                        
-                        let a = vAssetId ? regByAssetId[vAssetId] : null;
-                        if (!a && normName !== 'unknown-asset') a = regByNormName[normName];
+                        const qid = g('qid');
+                        if (!qid) return;
+                        rowsCorrelated++;
+                        matched.add(a.normalizedName);
 
-                        if (!a) {
-                            uniqueAssetsSkipped.add(vAssetId || normName);
-                            return; // Unmapped finding
-                        }
+                        const proto = g('protocol'), port = g('port');
+                        const key = `${a.normalizedName}|${qid}|${proto}|${port}`;
+                        const sev = parseInt(g('severity')) || 0;
+                        const qvs = parseFloat(g('qvs score')) || 0;
+                        const cve = g('cve');
+                        const cvss = parseFloat(g('cvssv3.1 base')) || parseFloat(g('cvssv2 base')) || 0;
 
-                        uniqueAssetsMatched.add(a.normalizedName);
-                        findingsAggregated++;
-
-                        const severity = parseInt(safeGet(['Severity'])) || 0;
-                        const cve = safeGet(['CVE ID', 'CVE']);
-                        const title = safeGet(['Title', 'Vulnerability Title']);
-                        const truRisk = parseFloat(safeGet(['TruRisk Score', 'TruRisk'])) || 0;
-                        const patchable = String(safeGet(['Vuln Patchable', 'Patchable'])).toLowerCase() === 'yes' || String(safeGet(['Vuln Patchable', 'Patchable'])) === '1';
-
-                        const multiplier = RiskScoringEngine.getMultiplier(a.exposure);
-                        const weightedRisk = truRisk * multiplier;
-
-                        // Asset Summary Bucket
-                        if (!assetSummary[a.normalizedName]) {
-                            assetSummary[a.normalizedName] = {
-                                assetId: a.assetId,
-                                name: a.normalizedName,
-                                owner: a.owner,
-                                service: a.service || 'Unclassified',
-                                exposure: a.exposure,
-                                riskStatus: a.riskStatus || 'Open',
-                                findingsTotal: 0,
-                                findingsCritical: 0,
-                                findingsPatchable: 0,
-                                riskTotal: 0,
-                                riskPatchable: 0,
-                                riskSev4Plus: 0,
-                                riskSev5: 0,
-                                topFindings: []
+                        // Qualys writes one row per CVE for the same detection: merge them.
+                        let d = dets.get(key);
+                        if (!d) {
+                            d = {
+                                k: key, asset: a.normalizedName, qid, proto, port, sev, qvs: 0, cvss: 0,
+                                status: g('status'), type: g('type detected'), first: g('first detected'), last: g('last detected'),
+                                age: parseInt(g('detection age')) || 0, times: parseInt(g('times detected')) || 0,
+                                patchable: g('vuln patchable').toLowerCase() === 'yes', cves: []
                             };
+                            dets.set(key, d);
                         }
-                        
-                        const as = assetSummary[a.normalizedName];
-                        as.findingsTotal++;
-                        if (severity === 5) as.findingsCritical++;
-                        if (patchable) as.findingsPatchable++;
-                        
-                        as.riskTotal += weightedRisk;
-                        if (patchable) as.riskPatchable += weightedRisk;
-                        if (severity >= 4) as.riskSev4Plus += weightedRisk;
-                        if (severity === 5) as.riskSev5 += weightedRisk;
+                        if (qvs > d.qvs) d.qvs = qvs;
+                        if (cvss > d.cvss) d.cvss = cvss;
+                        if (cve && d.cves.length < 40 && !d.cves.includes(cve)) d.cves.push(cve);
 
-                        const ageStr = (safeGet(['First Detected', 'Age']) || 'N/A').split('T')[0];
-                        as.topFindings.push([
-                            safeGet(['QID']) || '',
-                            cve,
-                            severity,
-                            title.substring(0, 100), // Trim for space
-                            patchable ? 1 : 0,
-                            ageStr,
-                            truRisk
-                        ]);
-
-                        // Service Summary Bucket
-                        const svc = as.service;
-                        if (!serviceSummary[svc]) serviceSummary[svc] = { service: svc, risk: 0 };
-                        serviceSummary[svc].risk += weightedRisk;
-
-                        // CVE Summary Bucket
-                        if (cve) {
-                            if (!cveSummary[cve]) cveSummary[cve] = { cve: cve, title: title, risk: 0 };
-                            cveSummary[cve].risk += weightedRisk;
+                        if (!assetInfo.has(a.normalizedName)) {
+                            assetInfo.set(a.normalizedName, { assetId: a.assetId, truRisk: parseFloat(g('trurisk score')) || 0, criticality: parseInt(g('asset critical score')) || 0 });
                         }
+
+                        // QID catalogue: the same text is repeated on every row, keep it once.
+                        let q = qids.get(qid);
+                        if (!q) {
+                            q = {
+                                qid, title: g('title'), sev, solution: g('solution').slice(0, 2000), threat: g('threat').slice(0, 600),
+                                category: g('category'), rti: g('rti').split(',').map(s => s.trim()).filter(Boolean),
+                                patchable: d.patchable, published: g('published date'), patchReleased: g('patch released')
+                            };
+                            qids.set(qid, q);
+                            qidCves.set(qid, new Map());
+                        }
+                        if (cve) { const m = qidCves.get(qid); if (!m.has(cve) && m.size < 200) m.set(cve, cvss); }
                     },
-                    complete: () => {
-                        console.log(`[Vuln Import] Complete.`);
-                        console.log(`[Vuln Import] Header Row Found: ${headerRowIndex}`);
-                        console.log(`[Vuln Import] Rows Processed: ${rowsProcessed}`);
-                        console.log(`[Vuln Import] Rows Correlated: ${findingsAggregated}`);
-                        console.log(`[Vuln Import] Rows Skipped (Unmapped): ${rowsProcessed - findingsAggregated}`);
+                    complete: async () => {
+                        try {
+                            qids.forEach(q => {
+                                const m = qidCves.get(q.qid);
+                                q.cveCount = m.size;
+                                q.cves = [...m].sort((x, y) => y[1] - x[1]).slice(0, 25).map(([id, cvss]) => ({ id, cvss }));
+                            });
+                            const detArr = [...dets.values()];
+                            const summary = this.buildAssetSummaries(detArr, qids, assetInfo, regByNormName);
 
-                        document.getElementById('vuln-prog-rows').textContent = rowsProcessed;
-                        document.getElementById('vuln-prog-matched').textContent = uniqueAssetsMatched.size;
-                        document.getElementById('vuln-prog-skipped').textContent = uniqueAssetsSkipped.size;
-                        document.getElementById('vuln-prog-agg').textContent = findingsAggregated;
+                            // What Qualys itself says about truncation, from the notes above the header row.
+                            const toInt = (s) => parseInt(String(s).replace(/,/g, ''), 10);
+                            const rec = { file: file.name, at: new Date().toISOString(), rows: rowsProcessed, correlated: rowsCorrelated, assets: matched.size, detections: detArr.length, notes: notes.slice(0, 6), skippedCount: skipped.size, skippedSample: [...skipped].slice(0, 30), replaced: replace };
+                            notes.forEach(n => {
+                                let m;
+                                if ((m = n.match(/Total detections.*?are\s+([\d,]+).*?only\s+([\d,]+)/i))) { rec.detTotal = toInt(m[1]); rec.detDown = toInt(m[2]); }
+                                if ((m = n.match(/Total cves.*?are\s+([\d,]+).*?only\s+([\d,]+)/i))) { rec.cveTotal = toInt(m[1]); rec.cveDown = toInt(m[2]); }
+                            });
+                            rec.truncated = (rec.detTotal > rec.detDown) || (rec.cveTotal > rec.cveDown) || notes.some(n => /only the first/i.test(n));
 
-                        // OPTIMIZATION: Cap the stored detailed findings to the top 25 highest risk per asset.
-                        Object.values(assetSummary).forEach(as => {
-                            as.topFindings = as.topFindings
-                                .sort((a, b) => b[6] - a[6]) // Sort by TruRisk descending
-                                .slice(0, 25); // Limit to top 25
-                        });
+                            await VulnStore.merge({ detections: detArr, qids: [...qids.values()], assets: [...matched], clearAll: replace });
 
-                        StorageService.save(StorageService.KEYS.VULN_ASSET_SUMMARY, Object.values(assetSummary));
-                        StorageService.save(StorageService.KEYS.VULN_SERVICE_SUMMARY, Object.values(serviceSummary));
-                        StorageService.save(StorageService.KEYS.VULN_CVE_SUMMARY, Object.values(cveSummary));
-                        
-                        this.renderVulnDashboard();
-                        
-                        setTimeout(() => {
-                            document.getElementById('vuln-import-progress').classList.add('hidden');
-                        }, 8000);
+                            const prevSummary = replace ? [] : (StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).filter(s => !matched.has(s.name));
+                            StorageService.save(StorageService.KEYS.VULN_ASSET_SUMMARY, prevSummary.concat(summary));
+                            const prevMeta = replace ? { imports: [] } : this.loadVulnMeta();
+                            const imports = (prevMeta.imports || []).concat(rec).slice(-20);
+                            StorageService.save(StorageService.KEYS.VULN_META, { imports, truncated: imports.some(i => i.truncated) });
+
+                            console.log(`[Vuln Import] rows=${rowsProcessed} correlated=${rowsCorrelated} detections=${detArr.length} qids=${qids.size} assets=${matched.size} skipped=${skipped.size} truncated=${rec.truncated}`);
+                            $('vuln-prog-rows').textContent = rowsProcessed;
+                            $('vuln-prog-matched').textContent = matched.size;
+                            $('vuln-prog-skipped').textContent = skipped.size;
+                            $('vuln-prog-agg').textContent = detArr.length;
+
+                            this.invalidateVulnData();
+                            await this.renderVulnDashboard();
+                            this.renderDashboard();
+                        } catch (e) {
+                            console.error('[Vuln Import] failed', e);
+                            $('vuln-header-info').textContent = 'Import failed: ' + e.message;
+                        }
+                        setTimeout(() => { $('vuln-import-progress').classList.add('hidden'); }, 8000);
+                        event.target.value = '';
                     }
                 });
             }
 
-            renderVulnDashboard() {
-                const cveSummary = StorageService.load(StorageService.KEYS.VULN_CVE_SUMMARY) || [];
-                const filteredAssets = this.getVulnFilteredAssets();
+            async renderVulnDashboard() {
+                const f = this.vulnState.filters;
+                const { dets, assets, vd } = await this.scopedData(f);
+                if (this.currentView !== 'vuln') return;
 
-                const { patchable, severity } = this.vulnState.filters;
-                const getRisk = (a) => {
-                    if (severity === '5') return a.riskSev5;
-                    if (severity === '4+') return a.riskSev4Plus;
-                    if (patchable === 'YES') return a.riskPatchable;
-                    return a.riskTotal;
-                };
+                document.getElementById('vuln-coverage').innerHTML = this.coverageHTML(f.owner, f.riskStatus);
 
-                let totalFindings = 0;
-                let totalRisk = 0;
-                let totalPatchableRisk = 0;
-                let totalCriticalFindings = 0;
-
-                const teamMap = {};
-                const svcMap = {};
-
-                filteredAssets.forEach(a => {
-                    totalFindings += a.findingsTotal;
-                    totalPatchableRisk += a.riskPatchable;
-                    totalCriticalFindings += a.findingsCritical;
-                    
-                    const r = getRisk(a);
-                    totalRisk += r;
-
-                    if (r > 0) {
-                        if (!teamMap[a.owner]) teamMap[a.owner] = { owner: a.owner, count: 0, risk: 0 };
-                        teamMap[a.owner].count++;
-                        teamMap[a.owner].risk += r;
-
-                        if (!svcMap[a.service]) svcMap[a.service] = { service: a.service, count: 0, risk: 0 };
-                        svcMap[a.service].count++;
-                        svcMap[a.service].risk += r;
-                    }
-                });
-
-                const riskMap = filteredAssets.map(a => ({ name: a.name, owner: a.owner, risk: getRisk(a) })).filter(a => a.risk > 0);
-                const patchableRiskMap = filteredAssets.map(a => ({ name: a.name, owner: a.owner, risk: a.riskPatchable })).filter(a => a.risk > 0);
-                const teams = Object.values(teamMap);
-                const svcs = Object.values(svcMap);
-                const cves = cveSummary;
-                
-                const getTop = (arr) => arr.sort((x, y) => y.risk - x.risk).slice(0, 10);
-                const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
-                const badge = (r) => {
-                    if (r > 1000000) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Critical</span>`;
-                    if (r >= 250000) return `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">High</span>`;
-                    if (r >= 50000) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Medium</span>`;
-                    return `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Low</span>`;
-                };
-                const empty = (c, m) => `<tr><td colspan="${c}" class="px-4 py-8 text-center text-gray-500 italic">${m}</td></tr>`;
-
+                const t1 = dets.filter(d => d.tier === 1);
+                const patchPct = dets.length ? Math.round(dets.filter(d => d.patchable).length / dets.length * 100) : 0;
                 document.getElementById('vuln-summary-metrics').innerHTML = `
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Findings</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalFindings)}</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Risk</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalRisk)}</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Patchable Risk</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalPatchableRisk)}</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Critical Findings</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalCriticalFindings)}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Assets With Findings</p><p class="text-2xl font-bold text-gray-900">${fmtNum(assets.length)}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Distinct Detections</p><p class="text-2xl font-bold text-gray-900">${fmtNum(dets.length)}</p></div>
+                    <div class="p-4 bg-red-50 rounded border border-red-200 shadow-sm"><p class="text-xs text-red-700 uppercase font-semibold">Fix Now (exploited)</p><p class="text-2xl font-bold text-red-800">${fmtNum(t1.length)}</p><p class="text-[10px] text-red-700">on ${fmtNum(new Set(t1.map(d => d.asset)).size)} assets</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Fixable By Patching</p><p class="text-2xl font-bold text-gray-900">${patchPct}%</p></div>
                 `;
 
-                const topAssets = getTop(riskMap);
+                const empty = (c, m) => `<tr><td colspan="${c}" class="px-4 py-8 text-center text-gray-500 italic">${m}</td></tr>`;
+                const none = 'No assets currently meet filter criteria.';
+
+                // Assets: criticality, then TruRisk
+                const topAssets = assets.slice(0, 10);
                 document.getElementById('vuln-top-assets').innerHTML = topAssets.length ? topAssets.map(t => {
                     const isChecked = this.vulnState.selectedAssets.has(t.name);
-                    return `<tr class="cursor-pointer ${isChecked ? 'bg-blue-50/60' : 'even:bg-gray-50 hover:bg-blue-50 transition'}" onclick="app.openAssetDetail('${t.name}')">
-                        <td class="px-3 py-2 text-center" onclick="event.stopPropagation()"><input type="checkbox" value="${t.name}" ${isChecked ? 'checked' : ''} onchange="app.toggleVulnAsset(this.value, this.checked)" class="rounded border-gray-300"></td>
-                        <td class="px-2 py-2 font-medium text-gray-700">${t.name}</td>
-                        <td class="px-2 py-2 text-gray-600">${t.owner}</td>
-                        <td class="px-2 py-2 text-center">${badge(t.risk)}</td>
-                        <td class="px-2 py-2 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td>
-                        <td class="px-2 py-2 text-right" onclick="event.stopPropagation()"><button onclick="app.openRiskModal(['${t.name}'], 'vuln')" class="text-amber-600 font-semibold hover:underline text-[10px] uppercase">Accept</button></td>
+                    return `<tr class="cursor-pointer ${isChecked ? 'bg-blue-50/60' : 'even:bg-gray-50 hover:bg-blue-50 transition'}" data-n="${esc(t.name)}" onclick="app.openAssetDetail(this.dataset.n)">
+                        <td class="px-3 py-2 text-center" onclick="event.stopPropagation()"><input type="checkbox" value="${esc(t.name)}" ${isChecked ? 'checked' : ''} onchange="app.toggleVulnAsset(this.value, this.checked)" class="rounded border-gray-300"></td>
+                        <td class="px-2 py-2 font-medium text-gray-700">${esc(t.name)}</td>
+                        <td class="px-2 py-2 text-gray-600">${esc(t.owner)}</td>
+                        <td class="px-2 py-2 text-center font-mono">${t.criticality || '-'}</td>
+                        <td class="px-2 py-2">${PriorityEngine.truRiskBadge(t.truRisk)}</td>
+                        <td class="px-2 py-2 text-right font-mono">${fmtNum(t.detections)}</td>
+                        <td class="px-2 py-2 text-right font-mono ${t.t1 ? 'text-red-700 font-bold' : 'text-gray-400'}">${fmtNum(t.t1)}</td>
+                        <td class="px-2 py-2 text-right" onclick="event.stopPropagation()"><button data-n="${esc(t.name)}" onclick="app.openRiskModal([this.dataset.n], 'vuln')" class="text-amber-600 font-semibold hover:underline text-[10px] uppercase">Accept</button></td>
                     </tr>`;
-                }).join('') : empty(6, "No assets currently meet filter criteria.");
+                }).join('') : empty(8, none);
 
-                const topPatchable = getTop(patchableRiskMap);
-                document.getElementById('vuln-top-patchable').innerHTML = topPatchable.length ? topPatchable.map(t => `<tr class="cursor-pointer even:bg-gray-50 hover:bg-blue-50 transition" onclick="app.openAssetDetail('${t.name}')"><td class="px-4 py-3 font-medium text-gray-700">${t.name}</td><td class="px-4 py-3 text-gray-600">${t.owner}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
+                // Fix groups
+                const groups = PriorityEngine.fixGroups(dets, vd.qmap);
+                document.getElementById('vuln-top-patchable').innerHTML = groups.length ? groups.slice(0, 10).map(g => `
+                    <tr class="cursor-pointer even:bg-gray-50 hover:bg-blue-50 transition" data-q="${esc(g.qid)}" onclick="app.inspectQid(this.dataset.q)">
+                        <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title="${esc(g.title)}">${esc(g.title)}</td>
+                        <td class="px-4 py-3 text-right font-mono">${fmtNum(g.assets.size)}</td>
+                        <td class="px-4 py-3 text-center">${PriorityEngine.tierBadge(g.tier)}</td>
+                        <td class="px-4 py-3 text-right font-mono">${g.qvs || '-'}</td>
+                    </tr>`).join('') : empty(4, none);
 
-                const topTeams = getTop(teams);
-                document.getElementById('vuln-top-teams').innerHTML = topTeams.length ? topTeams.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.owner}</td><td class="px-4 py-3 text-gray-600">${formatNum(t.count)} Assets</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
+                // Teams and services: counts and the worst asset, never a sum of a per-asset score
+                const roll = (keyFn) => {
+                    const m = new Map();
+                    assets.forEach(a => {
+                        const k = keyFn(a);
+                        if (!m.has(k)) m.set(k, { key: k, count: 0, maxTru: 0, t1: 0, detections: 0 });
+                        const e = m.get(k);
+                        e.count++; e.maxTru = Math.max(e.maxTru, a.truRisk); e.t1 += a.t1; e.detections += a.detections;
+                    });
+                    return [...m.values()].sort((x, y) => y.t1 - x.t1 || y.maxTru - x.maxTru).slice(0, 10);
+                };
+                const rollRows = (list) => list.length ? list.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${esc(t.key)}</td><td class="px-4 py-3 text-gray-600">${fmtNum(t.count)} assets</td><td class="px-4 py-3">${PriorityEngine.truRiskBadge(t.maxTru)}</td><td class="px-4 py-3 text-right font-mono ${t.t1 ? 'text-red-700 font-bold' : 'text-gray-400'}">${fmtNum(t.t1)}</td></tr>`).join('') : empty(4, none);
+                document.getElementById('vuln-top-teams').innerHTML = rollRows(roll(a => a.owner));
+                document.getElementById('vuln-top-services').innerHTML = rollRows(roll(a => a.service));
 
-                const topSvcs = getTop(svcs);
-                document.getElementById('vuln-top-services').innerHTML = topSvcs.length ? topSvcs.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.service}</td><td class="px-4 py-3 text-gray-600">${formatNum(t.count)} Assets</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
-
-                const topCves = getTop(cves);
-                document.getElementById('vuln-top-cves').innerHTML = topCves.length ? topCves.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-mono text-xs text-blue-700 font-semibold">${t.cve}</td><td class="px-4 py-3 text-sm truncate max-w-sm text-gray-700" title="${t.title}">${t.title || 'N/A'}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No correlated vulnerabilities available.");
+                // Known-exploited
+                const exploited = groups.filter(g => g.exploited).sort((x, y) => y.assets.size - x.assets.size || y.qvs - x.qvs).slice(0, 15);
+                document.getElementById('vuln-top-cves').innerHTML = exploited.length ? exploited.map(g => `
+                    <tr class="cursor-pointer even:bg-gray-50 hover:bg-blue-50 transition" data-q="${esc(g.qid)}" onclick="app.inspectQid(this.dataset.q)">
+                        <td class="px-4 py-3 font-mono text-xs text-blue-700 font-semibold">${esc(g.cve || 'QID ' + g.qid)}</td>
+                        <td class="px-4 py-3 text-sm truncate max-w-sm text-gray-700" title="${esc(g.title)}">${esc(g.title)}</td>
+                        <td class="px-4 py-3 text-right font-mono">${fmtNum(g.assets.size)}</td>
+                        <td class="px-4 py-3 text-right font-mono font-semibold">${g.qvs || '-'}</td>
+                    </tr>`).join('') : empty(4, 'No known-exploited vulnerabilities in the current selection.');
             }
 
             toggleVulnAsset(name, isChecked) {
@@ -1603,124 +1966,111 @@
                 this.renderVulnDashboard();
             }
 
-            toggleAllVuln(isChecked) {
-                const filtered = this.getVulnFilteredAssets().sort((x, y) => y.riskTotal - x.riskTotal).slice(0, 10); // Checkbox is only on top 10 visible
-                filtered.forEach(a => isChecked ? this.vulnState.selectedAssets.add(a.name) : this.vulnState.selectedAssets.delete(a.name));
+            async toggleAllVuln(isChecked) {
+                const top = (await this.getVulnFilteredAssets()).slice(0, 10); // checkbox only covers the 10 visible rows
+                top.forEach(a => isChecked ? this.vulnState.selectedAssets.add(a.name) : this.vulnState.selectedAssets.delete(a.name));
                 this.renderVulnDashboard();
             }
 
-            getVulnFilteredAssets() {
-                const assetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
-                const { patchable, severity, owner, exposure, riskStatus } = this.vulnState.filters;
-                return assetSummary.filter(a => {
-                    if (owner !== 'ALL' && a.owner !== owner) return false;
-                    if (exposure !== 'ALL' && a.exposure !== exposure) return false;
-                    if (riskStatus !== 'ALL' && (a.riskStatus || 'Open') !== riskStatus) return false;
-                    if (patchable === 'YES' && a.riskPatchable === 0) return false;
-                    if (severity === '4+' && a.riskSev4Plus === 0) return false;
-                    if (severity === '5' && a.riskSev5 === 0) return false;
-                    return a.riskTotal > 0;
-                });
+            async getVulnFilteredAssets() {
+                return (await this.scopedData(this.vulnState.filters)).assets;
             }
 
-            renderReports() {
-                const rawReg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                const rawAssetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
+            async renderReports() {
+                const $ = (id) => document.getElementById(id);
+                const scope = $('report-scope-selector').value;
+                const riskStatusFilter = $('report-risk-status-selector').value;
 
-                const scope = document.getElementById('report-scope-selector').value;
-                const riskStatusFilter = document.getElementById('report-risk-status-selector').value;
-                
-                document.getElementById('report-title').textContent = scope === 'ALL' ? 'Estate Risk Report' : `${scope} Team Risk Report`;
-                document.getElementById('report-date-main').textContent = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', day: 'numeric' });
+                $('report-title').textContent = scope === 'ALL' ? 'Estate Risk Report' : `${scope} Team Risk Report`;
+                $('report-date-main').textContent = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', day: 'numeric' });
 
-                const reg = rawReg.filter(r => (scope === 'ALL' || r.owner === scope) && (riskStatusFilter === 'ALL' || (r.riskStatus || 'Open') === riskStatusFilter));
-                const assetSummary = rawAssetSummary.filter(a => (scope === 'ALL' || a.owner === scope) && (riskStatusFilter === 'ALL' || (a.riskStatus || 'Open') === riskStatusFilter));
+                const sd = await this.scopedData({ owner: scope, riskStatus: riskStatusFilter });
+                if (this.currentView !== 'reports') return;
+                const { dets, assets, vd, inScope } = sd;
+                const groups = PriorityEngine.fixGroups(dets, vd.qmap);
+                this.reportCtx = { scope, riskStatusFilter, groups, assets, dets, inScope };
 
-                const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
-                const badge = (r) => {
-                    if (r > 1000000) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Critical</span>`;
-                    if (r >= 250000) return `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">High</span>`;
-                    if (r >= 50000) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Medium</span>`;
-                    return `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[10px] uppercase font-bold shadow-sm">Low</span>`;
-                };
+                $('rpt-coverage').innerHTML = this.coverageHTML(scope, riskStatusFilter);
+
+                // 1. Executive summary
+                const accepted = dets.filter(d => (sd.regMap.get(d.asset)?.riskStatus) === 'Risk Accepted').length;
+                const t1 = dets.filter(d => d.tier === 1), t2 = dets.filter(d => d.tier === 2);
+                const patchPct = dets.length ? Math.round(dets.filter(d => d.patchable).length / dets.length * 100) : 0;
+                const tile = (label, value, sub, cls = 'bg-slate-50 border') => `<div class="p-4 rounded ${cls}"><p class="text-[10px] text-gray-500 uppercase font-semibold">${label}</p><p class="text-xl font-bold text-gray-900">${value}</p>${sub ? `<p class="text-[11px] text-gray-500 mt-0.5">${sub}</p>` : ''}</div>`;
+                $('rpt-exec-summary').innerHTML =
+                    tile('Assets with findings', `${fmtNum(assets.length)} <span class="text-sm font-medium text-gray-500">of ${fmtNum(inScope.length)}</span>`, 'in scope') +
+                    tile('Open detections', fmtNum(dets.length), accepted ? `${fmtNum(accepted)} on risk-accepted assets` : `${fmtNum(groups.length)} distinct fixes`) +
+                    tile('Fix now', fmtNum(t1.length), `known exploited, ${fmtNum(new Set(t1.map(d => d.asset)).size)} assets · +${fmtNum(t2.length)} this sprint`, 'bg-red-50 border border-red-200') +
+                    tile('Fixable by patching', patchPct + '%', `${fmtNum(dets.filter(d => d.patchable).length)} of ${fmtNum(dets.length)} detections`, 'bg-blue-50 border border-blue-200');
+
                 const empty = (c, m) => `<tr><td colspan="${c}" class="px-2 py-4 text-center text-gray-500 italic">${m}</td></tr>`;
+                const t1cell = (n) => `<td class="px-2 py-2 text-right font-mono ${n ? 'text-red-700 font-bold' : 'text-gray-400'}">${fmtNum(n)}</td>`;
 
-                // 1. Executive Summary Calc
-                let totalFindings = 0, totalRisk = 0, totalPatchableRisk = 0;
-                const svcMap = {};
-                
-                // For reports, we still calculate total actionable vs accepted regardless of filter for the executive summary
-                let actionableRisk = 0, acceptedRisk = 0;
-
-                rawAssetSummary.filter(a => scope === 'ALL' || a.owner === scope).forEach(a => {
-                    const stat = a.riskStatus || 'Open';
-                    if (stat === 'Risk Accepted') acceptedRisk += a.riskTotal;
-                    else actionableRisk += a.riskTotal;
+                // 2. Services: assets, worst TruRisk, fix-now count
+                const svc = new Map();
+                assets.forEach(a => {
+                    if (!svc.has(a.service)) svc.set(a.service, { service: a.service, count: 0, maxTru: 0, t1: 0 });
+                    const e = svc.get(a.service);
+                    e.count++; e.maxTru = Math.max(e.maxTru, a.truRisk); e.t1 += a.t1;
                 });
+                const topSvcs = [...svc.values()].sort((x, y) => y.t1 - x.t1 || y.maxTru - x.maxTru).slice(0, 6);
+                $('rpt-svc-risk').innerHTML = topSvcs.length ? topSvcs.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700">${esc(t.service)}</td><td class="px-2 py-2 text-right font-mono">${fmtNum(t.count)}</td><td class="px-2 py-2">${PriorityEngine.truRiskBadge(t.maxTru)}</td>${t1cell(t.t1)}</tr>`).join('') : empty(4, 'No service data.');
 
-                assetSummary.forEach(a => {
-                    totalFindings += a.findingsTotal;
-                    totalPatchableRisk += a.riskPatchable;
-                    totalRisk += a.riskTotal;
+                // 3. Highest-risk assets: criticality, then TruRisk
+                const topAssets = assets.slice(0, 10);
+                $('rpt-top-assets').innerHTML = topAssets.length ? topAssets.map(t => `<tr class="cursor-pointer hover:bg-blue-50" data-n="${esc(t.name)}" onclick="app.openAssetDetail(this.dataset.n)"><td class="px-2 py-2 font-medium text-gray-700 truncate max-w-[180px]" title="${esc(t.name)}">${esc(t.name)}</td><td class="px-2 py-2 text-center font-mono">${t.criticality || '-'}</td><td class="px-2 py-2">${PriorityEngine.truRiskBadge(t.truRisk)}</td><td class="px-2 py-2 text-right font-mono">${fmtNum(t.detections)}</td>${t1cell(t.t1)}</tr>`).join('') : empty(5, 'No asset data.');
 
-                    if (a.riskTotal > 0) {
-                        if (!svcMap[a.service]) svcMap[a.service] = { service: a.service, risk: 0 };
-                        svcMap[a.service].risk += a.riskTotal;
-                    }
-                });
+                // 4. Patching priority queue: fixes, not assets
+                const topFix = groups.slice(0, 10);
+                $('rpt-patch-priority').innerHTML = topFix.length ? topFix.map(g => `<tr class="cursor-pointer hover:bg-blue-50" data-q="${esc(g.qid)}" onclick="app.inspectQid(this.dataset.q)"><td class="px-2 py-2 text-gray-700 truncate max-w-[220px]" title="${esc(g.title)}">${esc(g.title)}</td><td class="px-2 py-2 text-right font-mono">${fmtNum(g.assets.size)}</td><td class="px-2 py-2 text-center">${PriorityEngine.tierBadge(g.tier)}</td><td class="px-2 py-2 text-center">${g.patchable ? '✅' : '—'}</td></tr>`).join('') : empty(4, 'No fix data.');
 
-                document.getElementById('rpt-exec-summary').innerHTML = `
-                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Risk</p><p class="text-xl font-bold text-gray-900">${formatNum(actionableRisk + acceptedRisk)}</p></div>
-                    <div class="p-4 bg-amber-50 rounded border border-amber-200"><p class="text-[10px] text-amber-700 uppercase font-semibold">Accepted Risk</p><p class="text-xl font-bold text-amber-900">${formatNum(acceptedRisk)}</p></div>
-                    <div class="p-4 bg-blue-50 rounded border border-blue-200"><p class="text-[10px] text-blue-700 uppercase font-semibold">Actionable Risk</p><p class="text-xl font-bold text-blue-900">${formatNum(actionableRisk)}</p></div>
-                    <div class="p-4 bg-red-50 rounded border border-red-200"><p class="text-[10px] text-red-700 uppercase font-semibold">Patchable Risk</p><p class="text-xl font-bold text-red-900">${formatNum(totalPatchableRisk)}</p></div>
-                `;
-
-                const getTop = (arr, limit = 5) => arr.sort((x, y) => y.risk - x.risk).slice(0, limit);
-
-                // 2. Services
-                const topSvcs = getTop(Object.values(svcMap));
-                document.getElementById('rpt-svc-risk').innerHTML = topSvcs.length ? topSvcs.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700">${t.service}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No service risk data.");
-
-                // 3. Top Assets
-                const topAssets = getTop(assetSummary.map(a => ({ name: a.name, risk: a.riskTotal })).filter(a => a.risk > 0));
-                document.getElementById('rpt-top-assets').innerHTML = topAssets.length ? topAssets.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700 truncate max-w-[200px]">${t.name}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No asset risk data.");
-
-                // 4. Patch Priority
-                const topPatch = getTop(assetSummary.map(a => ({ name: a.name, risk: a.riskPatchable })).filter(a => a.risk > 0));
-                document.getElementById('rpt-patch-priority').innerHTML = topPatch.length ? topPatch.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700 truncate max-w-[200px]">${t.name}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No patchable risk data.");
-
-                // 5. Governance Health
+                // 5. Governance health
+                const reg = inScope;
                 const missingOwnerCount = reg.filter(r => !r.owner || r.owner === 'Unknown').length;
                 const unclassifiedCount = reg.filter(r => !r.service || r.service === 'Unclassified').length;
                 const healthScore = reg.length === 0 ? 100 : Math.round(((reg.length - (scope === 'ALL' ? missingOwnerCount : 0) - unclassifiedCount) / reg.length) * 100);
-                
-                document.getElementById('rpt-gov-health').innerHTML = `
+                $('rpt-gov-health').innerHTML = `
                     <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Scope Data Health</span><span class="font-bold ${healthScore > 90 ? 'text-green-600' : 'text-amber-600'}">${healthScore}%</span></div>
                     ${scope === 'ALL' ? `<div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Missing Ownership</span><span class="font-bold text-red-600">${missingOwnerCount} Assets</span></div>` : ''}
                     <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Unclassified Services</span><span class="font-bold text-amber-600">${unclassifiedCount} Assets</span></div>
                 `;
 
-                // 6. Recommended Actions Next 30 Days
+                // 6. Recommended actions: concrete, from the data
                 const actions = [];
-                if (topPatch.length > 0) {
-                    const topPatchRisk = topPatch.reduce((sum, a) => sum + a.risk, 0);
-                    actions.push(`<strong>Execute Patching Sprint:</strong> Deploy updates to the ${topPatch.length} assets in the Patching Priority Queue. This specific action will eliminate <strong>${formatNum(topPatchRisk)}</strong> of preventable risk.`);
+                const have = new Set(assets.map(a => a.name));
+                const noData = inScope.filter(r => !have.has(r.normalizedName)).length;
+                const meta = this.loadVulnMeta();
+                if (meta.imports.length && noData > 0) {
+                    actions.push(`<strong>Close the data gap:</strong> ${fmtNum(noData)} of ${fmtNum(inScope.length)} assets in scope have no vulnerability data. ${meta.truncated ? 'The Qualys export was truncated, so import further batches (by tag or asset group) before relying on these figures.' : 'Check they are being scanned.'}`);
                 }
-                if (topAssets.length > 0 && topAssets[0].risk > 100000) {
-                    actions.push(`<strong>Isolate Critical Infrastructure:</strong> The asset <em>${topAssets[0].name}</em> represents an extreme risk concentration. Investigate immediately for decommissioning, patching, or network isolation.`);
+                const exploitedGroups = groups.filter(g => g.tier === 1);
+                if (exploitedGroups.length) {
+                    const top = exploitedGroups[0];
+                    actions.push(`<strong>Fix known-exploited vulnerabilities first:</strong> ${fmtNum(t1.length)} detections across ${fmtNum(exploitedGroups.length)} fixes are flagged CISA KEV, actively attacked, ransomware, wormable or zero-day. Start with <em>${esc(top.title)}</em> (${fmtNum(top.assets.size)} assets).`);
                 }
-                if (scope === 'ALL' && missingOwnerCount > 0) {
-                    actions.push(`<strong>Assign Orphaned Systems:</strong> There are <strong>${missingOwnerCount}</strong> active assets with no accountable team. Triage the Review Queue to establish operational ownership.`);
+                const patchGroups = groups.filter(g => g.patchable);
+                if (patchGroups.length) {
+                    const cleared = patchGroups.reduce((n, g) => n + g.detections, 0);
+                    actions.push(`<strong>Work the fix queue in order:</strong> ${fmtNum(patchGroups.length)} of the ${fmtNum(groups.length)} fixes are patches, and applying them all would clear ${fmtNum(cleared)} of ${fmtNum(dets.length)} open detections (${dets.length ? Math.round(cleared / dets.length * 100) : 0}%). The rest need an upgrade or a compensating control.`);
                 }
-                if (unclassifiedCount > 0) {
-                    actions.push(`<strong>Map Application Services:</strong> <strong>${unclassifiedCount}</strong> assets in this scope are missing service context. Update the register to enable accurate application-level downtime and risk planning.`);
+                if (topAssets.length) {
+                    const a = topAssets[0];
+                    actions.push(`<strong>Review <em>${esc(a.name)}</em> first:</strong> criticality ${a.criticality || 'n/a'}, TruRisk ${fmtNum(a.truRisk)} (${PriorityEngine.band(a.truRisk).label}), ${fmtNum(a.t1)} fix-now detections.`);
                 }
-                
-                if (actions.length === 0) actions.push("<strong>Operational Excellence:</strong> No critical governance actions required for this scope this month. Infrastructure is well-maintained.");
-                
-                document.getElementById('rpt-actions').innerHTML = actions.map(a => `<li>${a}</li>`).join('');
+                const unpatchable = dets.filter(d => !d.patchable).length;
+                if (unpatchable > 0) actions.push(`<strong>Plan for the unpatchable:</strong> ${fmtNum(unpatchable)} detections have no patch (end-of-life software, configuration issues). They need an upgrade, a compensating control or a risk acceptance.`);
+                if (scope === 'ALL' && missingOwnerCount > 0) actions.push(`<strong>Assign Orphaned Systems:</strong> ${missingOwnerCount} assets have no accountable team. Triage the Review Queue.`);
+                if (unclassifiedCount > 0) actions.push(`<strong>Map Application Services:</strong> ${unclassifiedCount} assets in this scope are missing service context.`);
+                if (actions.length === 0) actions.push('<strong>No critical governance actions required for this scope.</strong>');
+                $('rpt-actions').innerHTML = actions.map(a => `<li>${a}</li>`).join('');
+
+                // 7. AI plan: show a cached answer if one exists
+                const aiKey = 'report:' + scope + ':' + riskStatusFilter;
+                const out = $('rpt-ai-out');
+                out.dataset.key = aiKey;
+                out.innerHTML = this.aiCache.get(aiKey) || '<p class="text-gray-500 italic print-hide">Generate a 30-day plan from the fixes and assets above. Works with the provider set under AI Settings.</p>';
             }
+
 
             renderRiskAcceptances() {
                 const acceptances = StorageService.load(StorageService.KEYS.RISK_ACCEPTANCES) || [];
@@ -1745,12 +2095,12 @@
                          
                          // Pull true active risk from Vuln Summary instead of manual input
                          const as = vulnSum.find(v => v.name === a.asset);
-                         if (as) acceptedRisk += as.riskTotal;
+                         if (as) acceptedRisk += (as.detections || 0);
                     }
                 });
                 
                 document.getElementById('risk-accept-kpis').innerHTML = `
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Accepted Risk</p><p class="text-2xl font-bold text-amber-600">${formatNum(acceptedRisk)}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Accepted Detections</p><p class="text-2xl font-bold text-amber-600">${formatNum(acceptedRisk)}</p></div>
                     <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Accepted Assets</p><p class="text-2xl font-bold text-gray-900">${acceptedAssets.size}</p></div>
                     <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Expiring (30d)</p><p class="text-2xl font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-gray-900'}">${expiringCount}</p></div>
                     <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Overdue</p><p class="text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-gray-900'}">${overdueCount}</p></div>
@@ -1771,7 +2121,7 @@
                     }
                     
                     const as = vulnSum.find(v => v.name === a.asset);
-                    const trueRisk = as ? as.riskTotal : 0;
+                    const trueRisk = as ? (as.detections || 0) : 0;
 
                     return `<tr class="cursor-pointer hover:bg-gray-50" onclick="app.openAssetDetail('${a.asset}')">
                         <td class="px-6 py-3">
@@ -1789,99 +2139,372 @@
                 }).join('');
             }
 
-            openAssetDetail(assetName) {
-                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER).find(r => r.normalizedName === assetName);
-                if (!reg) return;
-                
-                const vulnSum = (StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).find(v => v.name === assetName);
-                const vulns = vulnSum ? (vulnSum.topFindings || []) : [];
+            // ------------------------------------------
+            // Inspect: report -> asset -> vulnerability -> affected assets
+            // ------------------------------------------
 
-                this.raState.currentDetailAsset = assetName;
+            openAssetDetail(name) { this.inspectNav({ type: 'asset', id: name }); }
+            inspectAsset(name) { this.inspectNav({ type: 'asset', id: name }); }
+            inspectQid(qid) { this.inspectNav({ type: 'qid', id: String(qid) }); }
 
-                document.getElementById('det-name').textContent = assetName;
-                document.getElementById('det-env').textContent = `${reg.environment || 'Prod'} • ${reg.service || 'Unclassified'} • ${reg.exposure || 'Unknown Exposure'}`;
-                
-                const detOwnerEl = document.getElementById('det-owner');
-                if (detOwnerEl) detOwnerEl.textContent = reg.owner || 'Unknown';
-                
-                const detStatusEl = document.getElementById('det-status');
-                if (detStatusEl) detStatusEl.textContent = reg.riskStatus || 'Open';
-
-                const formatNum = (n) => Math.round(n).toLocaleString();
-                
-                let actionable = 0, totalRisk = 0, patchableRisk = 0;
-                let totalFind = 0, critFind = 0, patchFind = 0;
-
-                if (vulnSum) {
-                    totalRisk = vulnSum.riskTotal;
-                    patchableRisk = vulnSum.riskPatchable;
-                    totalFind = vulnSum.findingsTotal;
-                    critFind = vulnSum.findingsCritical;
-                    patchFind = vulnSum.findingsPatchable;
-
-                    if ((reg.riskStatus || 'Open') !== 'Risk Accepted') actionable = vulnSum.riskTotal;
-                }
-
-                const el = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
-                el('det-total-find', formatNum(totalFind));
-                el('det-crit-find', formatNum(critFind));
-                el('det-patch-find', formatNum(patchFind));
-                el('det-total-risk', formatNum(totalRisk));
-                el('det-actionable', formatNum(actionable));
-                el('det-patch-risk', formatNum(patchableRisk));
-
-                const tbody = document.getElementById('det-vulns-tbody');
-                if (vulns.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-6 text-center text-gray-500 italic">No detailed findings retained for this asset.</td></tr>';
-                } else {
-                    const badge = (s) => s === 5 ? `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] font-bold">5</span>` : (s === 4 ? `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold">4</span>` : `<span class="bg-gray-100 text-gray-800 px-2 py-0.5 rounded text-[10px] font-bold">${s}</span>`);
-                    tbody.innerHTML = vulns.sort((a,b) => b[6] - a[6]).map(v => `
-                        <tr class="hover:bg-gray-50 transition">
-                            <td class="px-3 py-2 text-center">${badge(v[2])}</td>
-                            <td class="px-3 py-2 text-xs font-mono text-gray-500">${v[0]}</td>
-                            <td class="px-3 py-2 text-xs font-mono text-blue-600 font-semibold">${v[1] || '-'}</td>
-                            <td class="px-3 py-2 text-xs text-gray-800 truncate max-w-sm" title="${v[3]}">${v[3]}</td>
-                            <td class="px-3 py-2 text-center text-xs">${v[4] ? '✅' : '-'}</td>
-                            <td class="px-3 py-2 text-xs text-gray-500">${v[5]}</td>
-                            <td class="px-3 py-2 text-right text-xs font-mono font-bold">${Math.round(v[6])}</td>
-                        </tr>
-                    `).join('');
-                }
-                
-                document.getElementById('det-advice-content').innerHTML = 'Click generate to analyze findings and calculate estimated risk reduction.';
-                document.getElementById('modal-asset-detail').classList.remove('hidden');
+            inspectNav(entry) {
+                const st = this.inspectState;
+                if (this.currentView !== 'inspect') { this.inspectReturn = this.currentView || 'dashboard'; st.stack = []; }
+                st.stack.push(entry);
+                st.filters = { tier: 'ALL', patchable: 'ALL', q: '' };
+                this.switchView('inspect');
+                this.renderInspect();
             }
 
-            generateRemediationAdvice() {
-                const assetName = this.raState.currentDetailAsset;
-                const vulnSum = (StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).find(v => v.name === assetName);
-                const vulns = vulnSum ? (vulnSum.topFindings || []) : [];
-                const out = document.getElementById('det-advice-content');
-                
-                if (vulns.length === 0) {
-                    out.innerHTML = '<span class="text-gray-500">No vulnerabilities found to generate advice.</span>';
+            inspectBack(toIndex) {
+                const st = this.inspectState;
+                if (typeof toIndex === 'number') st.stack = st.stack.slice(0, toIndex + 1);
+                else st.stack.pop();
+                if (st.stack.length) { st.filters = { tier: 'ALL', patchable: 'ALL', q: '' }; this.renderInspect(); }
+                else this.switchView(this.inspectReturn || 'dashboard');
+            }
+
+            inspectFilter(key, val) {
+                this.inspectState.filters[key] = val;
+                this.renderAssetRows();
+            }
+
+            async renderInspect() {
+                const e = this.inspectState.stack[this.inspectState.stack.length - 1];
+                if (!e) return;
+                document.getElementById('view-container').scrollTop = 0;
+                const retLabel = { reports: 'Report', vuln: 'Vuln Management', dashboard: 'Dashboard', 'risk-accept': 'Risk Acceptances', register: 'Register' }[this.inspectReturn] || 'Back';
+                const crumbs = this.inspectState.stack.map((s, i) => {
+                    const label = s.type === 'asset' ? s.id : 'QID ' + s.id;
+                    const last = i === this.inspectState.stack.length - 1;
+                    return last ? `<span class="font-semibold text-gray-800">${esc(label)}</span>` : `<a href="#" class="text-blue-600 hover:underline" onclick="app.inspectBack(${i}); return false;">${esc(label)}</a>`;
+                });
+                document.getElementById('inspect-crumbs').innerHTML = `<a href="#" class="text-blue-600 hover:underline" onclick="app.inspectBack(-1); return false;">${retLabel}</a> <span class="text-gray-400 mx-1">›</span> ` + crumbs.join(' <span class="text-gray-400 mx-1">›</span> ');
+                document.getElementById('inspect-body').innerHTML = '<p class="text-gray-500 italic p-6">Loading…</p>';
+                if (e.type === 'asset') await this.renderInspectAsset(e.id); else await this.renderInspectQid(e.id);
+            }
+
+            // Plain-language fix order from the data alone; works with no AI configured.
+            localRemediation(list, vd) {
+                if (!list.length) return '<p class="text-gray-600">No detections on record for this asset.</p>';
+                const groups = PriorityEngine.fixGroups(list, vd.qmap);
+                const patchGroups = groups.filter(g => g.patchable);
+                const patchDets = list.filter(d => d.patchable).length;
+                const t1 = groups.filter(g => g.tier === 1), t2 = groups.filter(g => g.tier === 2);
+                const solutionOf = (qid) => (vd.qmap.get(qid)?.solution || '').replace(/\s+/g, ' ').slice(0, 220);
+                const item = (g) => `<li><a href="#" class="text-blue-700 hover:underline font-medium" data-q="${esc(g.qid)}" onclick="app.inspectQid(this.dataset.q); return false;">${esc(g.title)}</a>${solutionOf(g.qid) ? `<div class="text-xs text-gray-600">${linkify(esc(solutionOf(g.qid)))}</div>` : ''}</li>`;
+                let html = '<ul class="list-disc pl-5 space-y-2 text-sm text-gray-800">';
+                html += `<li><strong>${fmtNum(patchGroups.length)} patchable fix${patchGroups.length === 1 ? '' : 'es'}</strong> would remove ${fmtNum(patchDets)} of ${fmtNum(list.length)} detections (${Math.round(patchDets / list.length * 100)}%).</li>`;
+                if (t1.length) html += `<li><strong>Fix now (${t1.length}):</strong> known-exploited.<ul class="list-circle pl-5 mt-1 space-y-1.5">${t1.slice(0, 5).map(item).join('')}</ul>${t1.length > 5 ? `<div class="text-xs text-gray-500 mt-1">…and ${t1.length - 5} more, see the table below.</div>` : ''}</li>`;
+                if (t2.length) html += `<li><strong>This sprint (${t2.length}):</strong> high QVS or remote code execution with a public exploit.<ul class="list-circle pl-5 mt-1 space-y-1.5">${t2.slice(0, 3).map(item).join('')}</ul></li>`;
+                const unpatch = list.filter(d => !d.patchable).length;
+                if (unpatch) html += `<li><strong>${fmtNum(unpatch)} detections have no patch:</strong> plan an upgrade, a compensating control or a risk acceptance.</li>`;
+                html += '</ul>';
+                return html;
+            }
+
+            async renderInspectAsset(name) {
+                const vd = await this.getVulnData();
+                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER).find(r => r.normalizedName === name);
+                const body = document.getElementById('inspect-body');
+                if (!reg) { body.innerHTML = '<p class="p-6 text-gray-600">This asset is not in the register.</p>'; return; }
+                const sum = (StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).find(s => s.name === name) || {};
+                const all = vd.byAsset.get(name) || [];
+                const st = PriorityEngine.blank();
+                all.forEach(d => PriorityEngine.accumulate(st, d));
+                this.inspectCtx = { name, all, vd };
+                const meta = this.loadVulnMeta();
+                const kpi = (label, v, cls = 'bg-gray-50 border') => `<div class="${cls} p-3 rounded"><p class="text-[10px] uppercase font-semibold opacity-70">${label}</p><p class="text-xl font-bold">${v}</p></div>`;
+
+                body.innerHTML = `
+                    <div class="bg-white rounded-lg shadow border p-5">
+                        <div class="flex flex-wrap justify-between gap-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-800">${esc(name)}</h3>
+                                <p class="text-sm text-gray-500">${esc(reg.environment || 'Production')} • ${esc(reg.service || 'Unclassified')} • ${esc(reg.exposure || 'Unknown exposure')}</p>
+                                <p class="text-xs mt-1 text-gray-700"><span class="font-semibold">Owner:</span> <span class="text-blue-600 font-bold">${esc(reg.owner || 'Unknown')}</span> <span class="mx-2 text-gray-300">|</span> <span class="font-semibold">Risk status:</span> <span class="uppercase font-bold">${esc(reg.riskStatus || 'Open')}</span></p>
+                                <p class="text-xs mt-1 text-gray-500">${esc(reg.os || '')}${reg.ipv4Address ? ' • ' + esc(reg.ipv4Address) : ''}</p>
+                            </div>
+                            <div class="flex items-start gap-6">
+                                <div class="text-right"><p class="text-[10px] uppercase font-semibold text-gray-500">TruRisk</p><div class="text-lg">${PriorityEngine.truRiskBadge(sum.truRisk || reg.baseRiskScore || 0)}</div></div>
+                                <div class="text-right"><p class="text-[10px] uppercase font-semibold text-gray-500">Criticality</p><p class="text-lg font-bold font-mono">${sum.criticality || '-'}<span class="text-xs text-gray-400">/5</span></p></div>
+                                <button data-n="${esc(name)}" onclick="app.openRiskModal([this.dataset.n])" class="bg-amber-100 text-amber-800 border border-amber-300 px-4 py-2 rounded text-sm font-bold hover:bg-amber-200">⚖️ Accept Risk</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mt-4">
+                            ${kpi('Detections', fmtNum(st.detections))}
+                            ${kpi('Fix now', fmtNum(st.t1), 'bg-red-50 border border-red-200 text-red-800')}
+                            ${kpi('This sprint', fmtNum(st.t2), 'bg-orange-50 border border-orange-200 text-orange-800')}
+                            ${kpi('Severity 5', fmtNum(st.sev5))}
+                            ${kpi('Patchable', fmtNum(st.patchable), 'bg-blue-50 border border-blue-200 text-blue-800')}
+                            ${kpi('Oldest', fmtNum(st.oldest) + ' d')}
+                        </div>
+                        ${meta.truncated ? '<p class="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">⚠️ The Qualys export was truncated, so this list may be incomplete.</p>' : ''}
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="bg-white rounded-lg shadow border p-5">
+                            <h4 class="font-semibold text-gray-800 mb-2">Recommended fix order</h4>
+                            ${this.localRemediation(all, vd)}
+                        </div>
+                        <div class="bg-blue-50 rounded-lg border border-blue-200 p-5">
+                            <h4 class="font-semibold text-blue-900 mb-2 flex justify-between items-center">AI remediation plan
+                                <span class="flex gap-2 print-hide">
+                                    <button onclick="app.runAI('asset', app.inspectCtx.name)" class="bg-blue-600 text-white px-3 py-1 text-xs rounded hover:bg-blue-700 shadow-sm font-medium">Generate</button>
+                                    <button onclick="app.runAI('asset', app.inspectCtx.name, true)" title="Ask again" class="bg-white text-blue-700 border border-blue-300 px-2 py-1 text-xs rounded hover:bg-blue-100">↻</button>
+                                </span>
+                            </h4>
+                            <div id="ai-out" class="text-sm text-gray-800"><p class="text-gray-600 italic">Click Generate for an AI plan covering fix order, per-OS steps, change risk and how to verify closure.</p></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow border overflow-hidden">
+                        <div class="bg-gray-50 px-4 py-3 border-b flex flex-wrap gap-3 items-center justify-between">
+                            <span class="font-semibold text-sm text-gray-700">Vulnerabilities <span id="insp-count" class="text-gray-500 font-normal"></span></span>
+                            <div class="flex flex-wrap gap-2 text-sm print-hide">
+                                <select onchange="app.inspectFilter('tier', this.value)" class="border-gray-300 rounded text-sm"><option value="ALL">All priorities</option><option value="1">Fix now</option><option value="2">This sprint</option><option value="3">Scheduled</option><option value="4">Routine</option></select>
+                                <select onchange="app.inspectFilter('patchable', this.value)" class="border-gray-300 rounded text-sm"><option value="ALL">Patchable or not</option><option value="YES">Patchable</option><option value="NO">No patch</option></select>
+                                <input type="search" placeholder="Search title, QID, CVE" oninput="app.inspectFilter('q', this.value)" class="border border-gray-300 rounded px-2 py-1 text-sm w-56">
+                            </div>
+                        </div>
+                        <div class="overflow-auto max-h-[28rem]">
+                            <table class="min-w-full text-left text-sm whitespace-nowrap">
+                                <thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr>
+                                    <th class="px-3 py-2">Priority</th><th class="px-3 py-2 text-center">Sev</th><th class="px-3 py-2 text-right">QVS</th><th class="px-3 py-2">QID</th><th class="px-3 py-2 w-full">Title</th><th class="px-3 py-2">CVE</th><th class="px-3 py-2">Port</th><th class="px-3 py-2">Status</th><th class="px-3 py-2 text-right">Age</th><th class="px-3 py-2 text-center">Patch</th>
+                                </tr></thead>
+                                <tbody id="insp-rows" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                const cached = this.aiCache.get('asset:' + name);
+                const out = document.getElementById('ai-out');
+                out.dataset.key = 'asset:' + name;
+                if (cached) out.innerHTML = cached;
+                this.renderAssetRows();
+            }
+
+            renderAssetRows() {
+                const ctx = this.inspectCtx, f = this.inspectState.filters;
+                if (!ctx) return;
+                const q = (f.q || '').toLowerCase();
+                const rows = ctx.all.filter(d => {
+                    if (f.tier !== 'ALL' && d.tier !== +f.tier) return false;
+                    if (f.patchable === 'YES' && !d.patchable) return false;
+                    if (f.patchable === 'NO' && d.patchable) return false;
+                    if (q) {
+                        const title = (ctx.vd.qmap.get(d.qid)?.title || '').toLowerCase();
+                        if (!title.includes(q) && !d.qid.includes(q) && !d.cves.some(c => c.toLowerCase().includes(q))) return false;
+                    }
+                    return true;
+                }).sort((a, b) => a.tier - b.tier || b.qvs - a.qvs || b.age - a.age);
+                const LIMIT = 500;
+                document.getElementById('insp-count').textContent = `(${fmtNum(rows.length)} of ${fmtNum(ctx.all.length)})`;
+                document.getElementById('insp-rows').innerHTML = rows.length ? rows.slice(0, LIMIT).map(d => {
+                    const qr = ctx.vd.qmap.get(d.qid) || {};
+                    const more = d.cves.length > 1 ? ` <span class="text-gray-400">+${d.cves.length - 1}</span>` : '';
+                    return `<tr class="cursor-pointer hover:bg-blue-50" data-q="${esc(d.qid)}" onclick="app.inspectQid(this.dataset.q)">
+                        <td class="px-3 py-2">${PriorityEngine.tierBadge(d.tier)}</td>
+                        <td class="px-3 py-2 text-center">${PriorityEngine.sevBadge(d.sev)}</td>
+                        <td class="px-3 py-2 text-right font-mono">${d.qvs || '-'}</td>
+                        <td class="px-3 py-2 font-mono text-xs text-gray-500">${esc(d.qid)}</td>
+                        <td class="px-3 py-2 max-w-xl truncate text-gray-800" title="${esc(qr.title)}">${esc(qr.title || '')}</td>
+                        <td class="px-3 py-2 font-mono text-xs text-blue-700">${esc(d.cves[0] || '-')}${more}</td>
+                        <td class="px-3 py-2 text-xs">${esc(d.port || '-')}</td>
+                        <td class="px-3 py-2 text-xs">${esc(d.status)}</td>
+                        <td class="px-3 py-2 text-right text-xs font-mono">${d.age}d</td>
+                        <td class="px-3 py-2 text-center">${d.patchable ? '✅' : '—'}</td>
+                    </tr>`;
+                }).join('') + (rows.length > LIMIT ? `<tr><td colspan="10" class="px-3 py-2 text-xs text-gray-500 text-center">Showing the first ${LIMIT}. Use the filters to narrow down.</td></tr>` : '')
+                    : '<tr><td colspan="10" class="px-3 py-8 text-center text-gray-500 italic">No detections match.</td></tr>';
+            }
+
+            async renderInspectQid(qid) {
+                const vd = await this.getVulnData();
+                const body = document.getElementById('inspect-body');
+                const q = vd.qmap.get(qid);
+                const list = vd.byQid.get(qid) || [];
+                if (!q) { body.innerHTML = '<p class="p-6 text-gray-600">This vulnerability is not in the imported data.</p>'; return; }
+                const reg = new Map(StorageService.load(StorageService.KEYS.ASSET_REGISTER).map(r => [r.normalizedName, r]));
+                const sums = new Map((StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).map(s => [s.name, s]));
+                const tier = list.length ? Math.min(...list.map(d => d.tier)) : 4;
+                const maxQvs = Math.max(0, ...list.map(d => d.qvs));
+                const oldest = Math.max(0, ...list.map(d => d.age));
+                const assets = [...new Set(list.map(d => d.asset))];
+                this.inspectCtx = { qid, vd };
+                const kpi = (label, v) => `<div class="bg-gray-50 border p-3 rounded"><p class="text-[10px] uppercase font-semibold opacity-70">${label}</p><p class="text-xl font-bold">${v}</p></div>`;
+                const cves = (q.cves || []).map(c => `<a class="inline-block mr-1 mb-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-mono hover:bg-blue-100" target="_blank" rel="noopener noreferrer" href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(c.id)}">${esc(c.id)}${c.cvss ? ' · ' + c.cvss : ''}</a>`).join('');
+
+                body.innerHTML = `
+                    <div class="bg-white rounded-lg shadow border p-5">
+                        <div class="flex flex-wrap justify-between gap-3">
+                            <div class="max-w-3xl">
+                                <p class="text-xs font-mono text-gray-500">QID ${esc(qid)} • ${esc(q.category || '')}</p>
+                                <h3 class="text-xl font-bold text-gray-800">${esc(q.title)}</h3>
+                                <div class="mt-2">${PriorityEngine.tierBadge(tier)} ${PriorityEngine.sevBadge(q.sev)} <span class="ml-2">${PriorityEngine.flagChips(q.rti, false)}</span></div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
+                            ${kpi('Affected assets', fmtNum(assets.length))}
+                            ${kpi('Max QVS', maxQvs || '-')}
+                            ${kpi('Oldest detection', fmtNum(oldest) + ' d')}
+                            ${kpi('Patch released', esc((q.patchReleased || '-').split(' ').slice(0, 3).join(' ')))}
+                            ${kpi('Fix available', q.patchable ? '✅ Patchable' : 'No patch')}
+                        </div>
+                        ${cves ? `<div class="mt-4"><p class="text-[10px] uppercase font-semibold text-gray-500 mb-1">CVEs (${fmtNum(q.cveCount || q.cves.length)}${(q.cveCount || 0) > q.cves.length ? ', highest CVSS shown' : ''})</p>${cves}</div>` : ''}
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="bg-white rounded-lg shadow border p-5 space-y-3 text-sm">
+                            <div><h4 class="font-semibold text-gray-800 mb-1">Vendor solution</h4><p class="text-gray-700 whitespace-pre-wrap break-words">${q.solution ? linkify(esc(q.solution)) : '<span class="italic text-gray-500">None provided.</span>'}</p></div>
+                            ${q.threat ? `<div><h4 class="font-semibold text-gray-800 mb-1">Threat</h4><p class="text-gray-700">${esc(q.threat)}</p></div>` : ''}
+                        </div>
+                        <div class="bg-blue-50 rounded-lg border border-blue-200 p-5">
+                            <h4 class="font-semibold text-blue-900 mb-2 flex justify-between items-center">AI remediation plan
+                                <span class="flex gap-2 print-hide">
+                                    <button onclick="app.runAI('qid', app.inspectCtx.qid)" class="bg-blue-600 text-white px-3 py-1 text-xs rounded hover:bg-blue-700 shadow-sm font-medium">Generate</button>
+                                    <button onclick="app.runAI('qid', app.inspectCtx.qid, true)" title="Ask again" class="bg-white text-blue-700 border border-blue-300 px-2 py-1 text-xs rounded hover:bg-blue-100">↻</button>
+                                </span>
+                            </h4>
+                            <div id="ai-out" data-key="qid:${esc(qid)}" class="text-sm text-gray-800">${this.aiCache.get('qid:' + qid) || '<p class="text-gray-600 italic">Click Generate for a rollout plan across the affected assets: order, change risk, steps per OS and how to verify.</p>'}</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow border overflow-hidden">
+                        <div class="bg-gray-50 px-4 py-3 border-b font-semibold text-sm text-gray-700">Affected assets (${fmtNum(assets.length)})</div>
+                        <div class="overflow-auto max-h-[28rem]">
+                            <table class="min-w-full text-left text-sm whitespace-nowrap">
+                                <thead class="bg-gray-100 text-gray-600 border-b sticky top-0"><tr><th class="px-3 py-2">Asset</th><th class="px-3 py-2">Owner</th><th class="px-3 py-2">Service</th><th class="px-3 py-2 text-center">Crit</th><th class="px-3 py-2">TruRisk</th><th class="px-3 py-2">Port</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">First detected</th><th class="px-3 py-2 text-right">Age</th></tr></thead>
+                                <tbody class="divide-y">${list.slice().sort((a, b) => ((sums.get(b.asset)?.criticality || 0) - (sums.get(a.asset)?.criticality || 0)) || ((sums.get(b.asset)?.truRisk || 0) - (sums.get(a.asset)?.truRisk || 0))).map(d => {
+                                    const r = reg.get(d.asset) || {}, s = sums.get(d.asset) || {};
+                                    return `<tr class="cursor-pointer hover:bg-blue-50" data-n="${esc(d.asset)}" onclick="app.inspectAsset(this.dataset.n)">
+                                        <td class="px-3 py-2 font-medium text-gray-800">${esc(d.asset)}</td><td class="px-3 py-2">${esc(r.owner || 'Unknown')}</td><td class="px-3 py-2">${esc(r.service || 'Unclassified')}</td>
+                                        <td class="px-3 py-2 text-center font-mono">${s.criticality || '-'}</td><td class="px-3 py-2">${PriorityEngine.truRiskBadge(s.truRisk || 0)}</td>
+                                        <td class="px-3 py-2 text-xs">${esc(d.port || '-')}</td><td class="px-3 py-2 text-xs">${esc(d.status)}</td><td class="px-3 py-2 text-xs">${esc(d.first)}</td><td class="px-3 py-2 text-right text-xs font-mono">${d.age}d</td></tr>`;
+                                }).join('')}</tbody>
+                            </table>
+                        </div>
+                    </div>`;
+            }
+
+            // ------------------------------------------
+            // AI remediation
+            // ------------------------------------------
+
+            static AI_SYSTEM = `You are a senior infrastructure security engineer advising a platform operations team on remediating vulnerabilities reported by Qualys.
+Use ONLY the data supplied. Never invent CVE numbers, patch versions, KB numbers or advisories; if the vendor solution is missing or unclear, say so.
+Be practical and specific to the operating systems and service roles shown (take extra care with domain controllers, databases and backup servers: snapshot first, stagger the rollout, use a maintenance window).
+Prefer fixes that clear many detections at once. Priority labels: "Fix now" = known exploited (CISA KEV, active attacks, ransomware, wormable, zero-day); "This sprint" = high QVS or remote code execution with a public exploit.
+Write in British English. Use Markdown headings, short bullet lists and numbered steps. Do not use tables. Keep it under about 450 words.
+Finish with a "Verify" section saying how to confirm in Qualys (agent check-in or rescan) that the detections have closed.`;
+
+            async buildAIPrompt(kind, id) {
+                const vd = await this.getVulnData();
+                const anon = new Anonymiser(AIService.load().anonymise);
+                const reg = new Map(StorageService.load(StorageService.KEYS.ASSET_REGISTER).map(r => [r.normalizedName, r]));
+                const sums = new Map((StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).map(s => [s.name, s]));
+                const meta = this.loadVulnMeta();
+                const caveat = meta.truncated ? 'Data caveat: the Qualys export was truncated, so the list may be incomplete.\n' : '';
+                const short = (s, n) => String(s || '').replace(/\s+/g, ' ').slice(0, n);
+                const flags = (q) => (q.rti || []).filter(t => PriorityEngine.SHORT_FLAGS[t]).map(t => PriorityEngine.SHORT_FLAGS[t]).join(', ') || 'none';
+                const assetLine = (name) => {
+                    const r = reg.get(name) || {}, s = sums.get(name) || {};
+                    return `${anon.alias(name)} | OS: ${short(r.os, 70) || 'unknown'} | service: ${r.service || 'Unclassified'} | owner: ${r.owner || 'Unknown'} | criticality ${s.criticality || '?'}/5 | TruRisk ${s.truRisk || '?'}`;
+                };
+                const groupLine = (g) => {
+                    const q = vd.qmap.get(g.qid) || {};
+                    const cves = (q.cves || []).slice(0, 4).map(c => c.id).join(', ');
+                    return `- [${PriorityEngine.LABELS[g.tier]}] QID ${g.qid} | ${short(q.title, 110)} | CVEs: ${cves || 'none'}${(q.cveCount || 0) > 4 ? ` (+${q.cveCount - 4})` : ''} | QVS ${g.qvs || '?'} | flags: ${flags(q)} | patchable: ${g.patchable ? 'yes' : 'no'} | assets: ${g.assets.size} | oldest ${g.maxAge}d | vendor solution: ${short(q.solution, 280) || 'none'}`;
+                };
+
+                if (kind === 'asset') {
+                    const list = vd.byAsset.get(id) || [];
+                    const groups = PriorityEngine.fixGroups(list, vd.qmap);
+                    const user = `Asset (one host):\n${assetLine(id)}\n${caveat}\nThe host has ${list.length} detections in ${groups.length} distinct fixes. The ${Math.min(30, groups.length)} highest-priority fixes:\n${groups.slice(0, 30).map(groupLine).join('\n')}\n\nTask: give a remediation plan for this host. Cover the fix order and why, what to do for the operating system shown, change risk for its service role, what cannot be patched and the compensating control, and how to verify.`;
+                    return { system: App.AI_SYSTEM, user, anon };
+                }
+                if (kind === 'qid') {
+                    const q = vd.qmap.get(id) || {};
+                    const list = vd.byQid.get(id) || [];
+                    const assets = [...new Set(list.map(d => d.asset))];
+                    const user = `Vulnerability: QID ${id} | ${short(q.title, 160)}\nCVEs: ${(q.cves || []).slice(0, 8).map(c => `${c.id} (CVSS ${c.cvss || '?'})`).join(', ') || 'none'}${(q.cveCount || 0) > 8 ? ` (+${q.cveCount - 8} more)` : ''}\nQualys real-time intelligence: ${(q.rti || []).join(', ') || 'none'}\nThreat: ${short(q.threat, 400)}\nVendor solution: ${short(q.solution, 900) || 'none provided'}\nPatchable: ${q.patchable ? 'yes' : 'no'} | patch released: ${q.patchReleased || 'unknown'}\n${caveat}\nAffected assets (${assets.length}${assets.length > 40 ? ', first 40 by criticality shown' : ''}):\n${assets.sort((a, b) => ((sums.get(b)?.criticality || 0) - (sums.get(a)?.criticality || 0))).slice(0, 40).map(assetLine).join('\n')}\n\nTask: explain the risk in plain terms, then give a rollout plan across these assets: which to do first and why, batching by service role and OS, change risk, concrete steps per operating system family seen, what to do where no patch exists, and how to verify.`;
+                    return { system: App.AI_SYSTEM, user, anon };
+                }
+                // report
+                const ctx = this.reportCtx || { groups: [], assets: [], dets: [], scope: 'ALL' };
+                const t1 = ctx.dets.filter(d => d.tier === 1).length;
+                const user = `Team report scope: ${ctx.scope === 'ALL' ? 'whole estate' : ctx.scope + ' team'}.\n${caveat}Assets with findings: ${ctx.assets.length} of ${ctx.inScope.length} in scope. Open detections: ${ctx.dets.length}. Fix-now (known exploited) detections: ${t1}. Distinct fixes: ${ctx.groups.length}.\n\nTop fixes (ranked by priority, then assets affected x QVS):\n${ctx.groups.slice(0, 15).map(groupLine).join('\n')}\n\nHighest-risk assets (criticality, then TruRisk):\n${ctx.assets.slice(0, 10).map(a => `${assetLine(a.name)} | detections ${a.detections} | fix-now ${a.t1}`).join('\n')}\n\nTask: write a 30-day remediation plan for this team, week by week. Say what to patch first and why, how to batch the work by service role to limit outage risk, what needs a risk acceptance or compensating control, and which data gaps to close.`;
+                return { system: App.AI_SYSTEM, user, anon };
+            }
+
+            async runAI(kind, id, force = false) {
+                const key = kind === 'report' ? (document.getElementById('rpt-ai-out').dataset.key) : `${kind}:${id}`;
+                const outId = kind === 'report' ? 'rpt-ai-out' : 'ai-out';
+                const out = document.getElementById(outId);
+                if (!AIService.configured()) {
+                    out.innerHTML = '<div class="rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">No AI provider is set up yet. <button onclick="app.openAISettings()" class="underline font-semibold">Open AI Settings</button></div>';
                     return;
                 }
-
-                const patchable = vulns.filter(v => v[4] === 1);
-                const crit = vulns.filter(v => v[2] === 5);
-                const riskRed = patchable.reduce((sum, v) => sum + v[6], 0);
-
-                let advice = `<ul class="list-disc pl-4 space-y-3 mt-2">`;
-                if (patchable.length > 0) {
-                    advice += `<li><strong>Priority 1 Patching Sprint:</strong> Deploy updates addressing ${patchable.length} vulnerabilities. This action will eliminate <strong>${Math.round(riskRed).toLocaleString()}</strong> points of preventable risk.</li>`;
+                if (!force && this.aiCache.has(key)) { out.innerHTML = this.aiCache.get(key); return; }
+                const s = AIService.load();
+                out.innerHTML = `<p class="text-gray-600 italic">Asking ${esc(AIService.PROVIDER_LABELS[s.provider])} (${esc(AIService.modelFor(s))})… this can take up to a minute.</p>`;
+                let html;
+                try {
+                    const { system, user, anon } = await this.buildAIPrompt(kind, id);
+                    const text = anon.restore(await AIService.complete(system, user));
+                    html = `<div>${mdToHtml(text)}</div><p class="text-[11px] text-gray-500 mt-3 border-t pt-2">Generated by ${esc(AIService.modelFor(s))} from the imported Qualys data${s.anonymise ? ' (hostnames were pseudonymised before sending)' : ''}. Check against the vendor advisory before applying.</p>`;
+                    this.aiCache.set(key, html);
+                } catch (e) {
+                    console.error('[AI]', e);
+                    html = `<div class="rounded border border-red-300 bg-red-50 p-3 text-red-800">AI request failed: ${esc(e.message)}</div>`;
                 }
-                if (crit.length > 0) {
-                    advice += `<li><strong>Critical Action:</strong> Investigate and address the highest severity finding immediately: <em>${crit[0][3]}</em> ${crit[0][1] ? `(CVE: ${crit[0][1]})` : ''}.</li>`;
-                }
-                if (patchable.length === 0 && crit.length === 0) {
-                    advice += `<li><strong>General Maintenance:</strong> Consider compensating controls, network isolation, or operating system upgrades for unpatchable findings.</li>`;
-                }
-                advice += `</ul>`;
-                out.innerHTML = advice;
+                const el = document.getElementById(outId);
+                if (el && el.dataset.key === key) el.innerHTML = html;
             }
 
-            openBulkRiskModal(source) {
+            openAISettings() {
+                const s = AIService.load();
+                const $ = (id) => document.getElementById(id);
+                $('ai-provider').value = s.provider;
+                $('ai-model').value = s.model;
+                $('ai-baseurl').value = s.baseUrl;
+                $('ai-key').value = s.apiKey;
+                $('ai-anon').checked = s.anonymise;
+                $('ai-test-result').textContent = '';
+                this.aiProviderChanged();
+                $('modal-ai-settings').classList.remove('hidden');
+            }
+
+            aiProviderChanged() {
+                const p = document.getElementById('ai-provider').value;
+                document.getElementById('ai-baseurl-row').classList.toggle('hidden', p !== 'openai');
+                document.getElementById('ai-model').placeholder = AIService.DEFAULT_MODELS[p] || 'model name, e.g. gpt-oss:latest';
+                document.getElementById('ai-key-label').textContent = p === 'openai' ? 'API key (optional)' : 'API key';
+            }
+
+            saveAISettings() {
+                const $ = (id) => document.getElementById(id);
+                AIService.save({ provider: $('ai-provider').value, model: $('ai-model').value.trim(), baseUrl: $('ai-baseurl').value.trim(), apiKey: $('ai-key').value.trim(), anonymise: $('ai-anon').checked });
+                this.aiCache.clear();
+                this.closeModals();
+            }
+
+            async testAISettings() {
+                const $ = (id) => document.getElementById(id);
+                const prev = AIService.load();
+                AIService.save({ provider: $('ai-provider').value, model: $('ai-model').value.trim(), baseUrl: $('ai-baseurl').value.trim(), apiKey: $('ai-key').value.trim(), anonymise: $('ai-anon').checked });
+                $('ai-test-result').className = 'text-xs mt-2 text-gray-600';
+                $('ai-test-result').textContent = 'Testing…';
+                try {
+                    const t = await AIService.complete('Reply with the single word OK.', 'ping');
+                    $('ai-test-result').className = 'text-xs mt-2 text-green-700';
+                    $('ai-test-result').textContent = 'Connected. Reply: ' + t.slice(0, 40);
+                } catch (e) {
+                    $('ai-test-result').className = 'text-xs mt-2 text-red-700';
+                    $('ai-test-result').textContent = e.message;
+                } finally { AIService.save(prev); }
+            }
+
+            async openBulkRiskModal(source) {
                 let selected = [];
                 let filtered = [];
                 
@@ -1890,7 +2513,7 @@
                     filtered = this.getRegisterFilteredAssets().map(r => r.normalizedName);
                 } else if (source === 'vuln') {
                     selected = Array.from(this.vulnState.selectedAssets);
-                    filtered = this.getVulnFilteredAssets().map(a => a.name);
+                    filtered = (await this.getVulnFilteredAssets()).map(a => a.name);
                 }
                 
                 if (selected.length === 0 && filtered.length === 0) return alert("No assets available to apply risk governance.");
@@ -1924,7 +2547,6 @@
                 document.getElementById('ra-exp-date').value = nextYear.toISOString().split('T')[0];
                 
                 // Hide any previous modals so it sits cleanly on top
-                document.getElementById('modal-asset-detail').classList.add('hidden');
                 document.getElementById('modal-risk-accept').classList.remove('hidden');
             }
 
@@ -1989,6 +2611,7 @@
                 this.renderRegister();
                 this.renderVulnDashboard();
                 this.renderRiskAcceptances();
+                if (this.currentView === 'inspect') this.renderInspect();
             }
 
             deleteRiskAcceptance(id, assetName) {
