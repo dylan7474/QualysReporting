@@ -296,7 +296,6 @@
 
             <!-- VIEW: VULNERABILITIES -->
             <section id="view-vuln" class="view-section space-y-6">
-                <!-- Implementation matches prior code exactly for Vuln UI -->
                 <div class="flex justify-between items-center mb-4">
                     <div>
                         <h3 class="text-xl font-semibold">Vulnerability Management</h3>
@@ -331,7 +330,6 @@
             </div>
         </div>
 
-        <!-- Remaining Modals identical to prior structure... -->
         <div id="modal-bulk-report" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
             <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
                 <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-emerald-100 mb-4">
@@ -509,7 +507,6 @@
                 return n.replace(/\.+$/, '').replace(/\s+/g, '-');
             }
 
-            // Hierarchical identity resolution for deduplication and register matching
             static getPrimaryId(asset) {
                 return asset.assetId || asset.hostId || asset.hardwareUuid || asset.normalizedName;
             }
@@ -664,7 +661,6 @@
                         };
 
                         if (existingIdx >= 0) {
-                            // Merge but do not overwrite manual governance decisions (exposure, environment, status)
                             const current = register[existingIdx];
                             register[existingIdx] = { 
                                 ...current, 
@@ -675,7 +671,6 @@
                                 environment: current.environment || 'Production',
                                 status: current.status || 'Approved'
                             };
-                            // Recalculate risk based on potentially preserved exposure
                             register[existingIdx].effectiveRiskScore = RiskScoringEngine.calculateEffectiveRisk(newRecord.baseRiskScore, register[existingIdx].exposure);
                         }
                         else register.push(newRecord);
@@ -691,7 +686,6 @@
             static run(importedAssets) {
                 const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 
-                // Build robust lookups for the Asset Register
                 const regByAssetId = new Map();
                 const regByHostId = new Map();
                 const regByUuid = new Map();
@@ -725,7 +719,6 @@
                 uniqueAssets.forEach(asset => {
                     totalProcessed++;
                     
-                    // Match against authoritative register hierarchically
                     let regItem = null;
                     if (asset.assetId && regByAssetId.has(asset.assetId)) regItem = regByAssetId.get(asset.assetId);
                     else if (asset.hostId && regByHostId.has(asset.hostId)) regItem = regByHostId.get(asset.hostId);
@@ -733,7 +726,6 @@
                     else if (asset.normalizedName && regByName.has(asset.normalizedName)) regItem = regByName.get(asset.normalizedName);
 
                     if (!regItem) {
-                        // Ownership Triage Resolver (Secondary sources)
                         let suggestedOwner = 'Unknown';
                         let ownershipSource = 'Unknown';
                         
@@ -757,9 +749,7 @@
                         const added = ReviewQueueService.enqueue(asset, "Newly discovered in Qualys");
                         if (added) newCount++;
                     } else {
-                        // Update activity / last seen on the existing register record
                         regItem.lastSeen = new Date().toISOString();
-                        // Sync IDs if they were previously missing
                         if (asset.assetId && !regItem.assetId) regItem.assetId = asset.assetId;
                         if (asset.hostId && !regItem.hostId) regItem.hostId = asset.hostId;
                         if (asset.hardwareUuid && !regItem.hardwareUuid) regItem.hardwareUuid = asset.hardwareUuid;
@@ -865,7 +855,6 @@
                     const mappedValues = Object.values(this.mappedHeaders);
                     const metadata = {};
                     
-                    // Capture all unmapped fields into metadata for future retention
                     keys.forEach((key, index) => {
                         if (!mappedValues.includes(index)) {
                             metadata[key] = row[key];
@@ -952,7 +941,7 @@
         }
 
         // ==========================================
-        // MAIN APP CONTROLLER
+        // MAIN APP CONTROLLER - SINGLE INSTANCE
         // ==========================================
 
         class App {
@@ -977,6 +966,8 @@
             }
 
             switchView(viewId) {
+                console.log(`Switching to view: ${viewId}`); // DIAGNOSTIC ADDED
+
                 document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
                 document.getElementById('view-' + viewId).classList.add('active');
                 
@@ -991,6 +982,7 @@
                 };
                 document.getElementById('page-title').textContent = titles[viewId];
 
+                // Execute the corresponding renderer automatically based on the view target
                 if (viewId === 'dashboard') this.renderDashboard();
                 if (viewId === 'review') this.renderReviewQueue();
                 if (viewId === 'register') this.renderRegister();
@@ -1106,6 +1098,7 @@
 
                 if (filtered.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500 italic bg-gray-50 border-b border-gray-200">No assets match the current queue filters.</td></tr>`;
+                    console.log(`Review Queue rows rendered: 0`); // DIAGNOSTIC ADDED
                     return;
                 }
 
@@ -1151,6 +1144,8 @@
                     };
                     tbody.appendChild(tr);
                 });
+
+                console.log(`Review Queue rows rendered: ${filtered.length}`); // DIAGNOSTIC ADDED
             }
 
             promptBulkAction(action, owner) {
@@ -1334,7 +1329,6 @@
                 const missingOwner = register.filter(r => !r.owner || r.owner === 'Unknown').length;
                 document.getElementById('rpt-health').textContent = missingOwner === 0 ? '100%' : Math.round(((register.length - missingOwner) / register.length) * 100) + '%';
 
-                // Render Ownership Sources (Section 3)
                 const sourcesList = document.getElementById('rpt-ownership-sources');
                 if (sourcesList) {
                     const sourceCounts = { 'Platform Inventory': 0, 'Naming Convention': 0, 'Manual Decision': 0, 'Unknown': 0 };
@@ -1361,7 +1355,7 @@
                 if (!file) return;
 
                 const resDiv = document.getElementById('vuln-import-result');
-                resDiv.classList.add('hidden');
+                if(resDiv) resDiv.classList.add('hidden');
 
                 Papa.parse(file, {
                     header: false,
@@ -1375,7 +1369,7 @@
                             }
                         }
 
-                        if(headerIdx === -1) {
+                        if(headerIdx === -1 && resDiv) {
                             resDiv.innerHTML = '❌ Could not detect vulnerability headers in CSV.';
                             resDiv.className = 'text-sm font-medium p-3 rounded border text-red-700 bg-red-50 border-red-200 mt-4';
                             return;
@@ -1395,7 +1389,7 @@
                             lastDetected: getCol(/^last.?detected/i)
                         };
 
-                        if(map.assetName === -1 || map.qid === -1) {
+                        if((map.assetName === -1 || map.qid === -1) && resDiv) {
                             resDiv.innerHTML = '❌ CSV is missing required columns (Asset Name or QID).';
                             resDiv.className = 'text-sm font-medium p-3 rounded border text-red-700 bg-red-50 border-red-200 mt-4';
                             return;
@@ -1421,8 +1415,10 @@
 
                         StorageService.save(StorageService.KEYS.VULNERABILITY_REGISTER, vulns);
                         
-                        resDiv.innerHTML = `✅ Successfully imported and mapped <strong>${vulns.length}</strong> vulnerability records.`;
-                        resDiv.className = 'text-sm font-medium p-3 rounded border text-emerald-700 bg-emerald-50 border-emerald-200 mt-4';
+                        if(resDiv) {
+                            resDiv.innerHTML = `✅ Successfully imported and mapped <strong>${vulns.length}</strong> vulnerability records.`;
+                            resDiv.className = 'text-sm font-medium p-3 rounded border text-emerald-700 bg-emerald-50 border-emerald-200 mt-4';
+                        }
                         
                         this.renderVulnDashboard();
                     }
@@ -1434,7 +1430,6 @@
                 const register = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
                 
                 const assetMap = {};
-                // Prepare matching for normalized names and UUID/IDs
                 register.forEach(r => {
                     if (r.normalizedName) assetMap[r.normalizedName] = r;
                     if (r.assetId) assetMap[r.assetId] = r;
@@ -1528,10 +1523,12 @@
             }
         }
 
-        // Boot Application
+        // Boot Application - Safe instance creation
         window.onload = () => {
-            window.app = new App();
-            app.init();
+            if (!window.app) {
+                window.app = new App();
+                window.app.init();
+            }
         };
     </script>
 </body>
