@@ -566,16 +566,18 @@
                     <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-800 text-2xl font-bold leading-none">&times;</button>
                 </div>
                 <div class="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3 mb-4">
-                    AI plans send vulnerability titles, CVEs, vendor solutions and asset roles to the provider you choose below. Pick a local model (an OpenAI-compatible server such as Ollama) if that data must stay in-house. The key is kept in this browser only and is not part of the backup.
+                    Chrome's built-in AI runs on this device: nothing is sent anywhere. A hosted provider receives vulnerability titles, CVEs, vendor solutions and asset roles; use a local model (an OpenAI-compatible server such as Ollama) if that data must stay in-house. Keys stay in this browser and are not part of the backup.
                 </div>
                 <div class="space-y-3 text-sm">
-                    <div><label class="block font-medium mb-1">Provider</label>
+                    <label class="flex items-start gap-2 rounded border bg-slate-50 p-3"><input id="ai-prefer-chrome" type="checkbox" class="mt-1 rounded border-gray-300"><span><strong>Use Chrome's built-in AI when available</strong> (on-device, free, private; falls back to the provider below)<span id="ai-chrome-status" class="block text-xs text-gray-500 mt-1"></span></span></label>
+                    <div><label class="block font-medium mb-1">Hosted / local provider</label>
                         <select id="ai-provider" onchange="app.aiProviderChanged()" class="w-full border rounded p-2"><option value="anthropic">Anthropic Claude</option><option value="gemini">Google Gemini</option><option value="openai">OpenAI-compatible (e.g. Ollama)</option></select></div>
                     <div id="ai-baseurl-row" class="hidden"><label class="block font-medium mb-1">Base URL</label>
                         <input id="ai-baseurl" class="w-full border rounded p-2" placeholder="http://localhost:11434/v1"></div>
                     <div><label class="block font-medium mb-1">Model</label><input id="ai-model" class="w-full border rounded p-2" placeholder=""></div>
                     <div><label id="ai-key-label" class="block font-medium mb-1">API key</label><input id="ai-key" type="password" autocomplete="off" class="w-full border rounded p-2"></div>
-                    <label class="flex items-start gap-2"><input id="ai-anon" type="checkbox" class="mt-1 rounded border-gray-300"><span>Replace hostnames with neutral aliases before sending (IP addresses are never sent)</span></label>
+                    <label class="flex items-start gap-2"><input id="ai-web" type="checkbox" class="mt-1 rounded border-gray-300"><span>Use public sources: look up NVD, CISA KEV, EPSS, Red Hat and OSV for the CVEs involved (only CVE ids are sent), and let Claude or Gemini search the web</span></label>
+                    <label class="flex items-start gap-2"><input id="ai-anon" type="checkbox" class="mt-1 rounded border-gray-300"><span>Replace hostnames with neutral aliases before sending to a hosted provider (IP addresses are never sent)</span></label>
                 </div>
                 <p id="ai-test-result" class="text-xs mt-2"></p>
                 <div class="flex justify-end gap-2 mt-4">
@@ -774,6 +776,12 @@
         // ==========================================
 
         const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        // Qualys text is half HTML (&quot; entities, <P> tags): decode it to plain text. DOMParser builds an inert document, so nothing runs.
+        const plain = (t) => {
+            if (!t) return '';
+            const doc = new DOMParser().parseFromString(String(t).replace(/<\s*(p|br)\s*\/?>/gi, '\n'), 'text/html');
+            return (doc.documentElement.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+        };
         const fmtNum = (n) => Math.round(n || 0).toLocaleString('en-GB');
         const linkify = (html) => html.replace(/(https?:\/\/(?:(?!&quot;|&#39;)[^\s<>)])+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline">$1</a>');
 
@@ -971,48 +979,75 @@
         class AIService {
             static KEY = 'gov_ai_settings';
             static DEFAULT_MODELS = { anthropic: 'claude-sonnet-5-5', gemini: 'gemini-2.5-flash', openai: '' };
-            static PROVIDER_LABELS = { anthropic: 'Anthropic Claude', gemini: 'Google Gemini', openai: 'OpenAI-compatible (e.g. Ollama)' };
+            static PROVIDER_LABELS = { anthropic: 'Anthropic Claude', gemini: 'Google Gemini', openai: 'OpenAI-compatible (e.g. Ollama)', chrome: "Chrome built-in AI (on-device)" };
+            static CHROME_OPTS = { expectedInputs: [{ type: 'text', languages: ['en'] }], expectedOutputs: [{ type: 'text', languages: ['en'] }] };
 
             static load() {
                 let s = {};
                 try { s = JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch (e) { /* ignore */ }
-                return { provider: 'anthropic', model: '', baseUrl: '', apiKey: '', anonymise: true, ...s };
+                return { provider: 'anthropic', model: '', baseUrl: '', apiKey: '', anonymise: true, preferChrome: true, webResearch: true, ...s };
             }
 
             static save(s) { localStorage.setItem(this.KEY, JSON.stringify(s)); }
 
             static modelFor(s = this.load()) { return s.model || this.DEFAULT_MODELS[s.provider] || ''; }
 
-            static configured() {
-                const s = this.load();
+            static remoteConfigured(s = this.load()) {
                 if (s.provider === 'openai') return !!(s.baseUrl && this.modelFor(s));
                 return !!s.apiKey;
             }
 
-            static async complete(system, user) {
+            // Chrome's Prompt API (Gemini Nano). Only exists on https:// or localhost pages, never file://.
+            static async chromeStatus() {
+                if (typeof LanguageModel === 'undefined') return isSecureContext ? 'unsupported' : 'insecure';
+                try { return await LanguageModel.availability(this.CHROME_OPTS); } catch (e) { return 'unavailable'; }
+            }
+
+            static chromeStatusText(st) {
+                return ({
+                    available: 'Ready: the on-device model is installed.',
+                    downloadable: 'Supported: the model downloads the first time you generate a plan.',
+                    downloading: 'The on-device model is still downloading.',
+                    unavailable: 'This Chrome or device cannot run the built-in model (check chrome://on-device-internals).',
+                    unsupported: 'This Chrome does not offer the Prompt API.',
+                    insecure: 'Not available on file:// pages. Open the portal from https:// (GitHub Pages) or http://localhost.'
+                })[st] || st;
+            }
+
+            // Prefer Chrome's on-device model when asked and usable; otherwise the configured provider.
+            static async resolve() {
                 const s = this.load();
-                const model = this.modelFor(s);
-                let url, headers = { 'Content-Type': 'application/json' }, body, pick;
-
-                if (s.provider === 'anthropic') {
-                    url = 'https://api.anthropic.com/v1/messages';
-                    headers['x-api-key'] = s.apiKey;
-                    headers['anthropic-version'] = '2023-06-01';
-                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
-                    body = { model, max_tokens: 2500, system, messages: [{ role: 'user', content: user }] };
-                    pick = (j) => (j.content || []).map(b => b.text || '').join('');
-                } else if (s.provider === 'gemini') {
-                    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-                    headers['x-goog-api-key'] = s.apiKey;
-                    body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }], generationConfig: { temperature: 0.2 } };
-                    pick = (j) => ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || '').join('');
-                } else {
-                    url = s.baseUrl.replace(/\/+$/, '') + '/chat/completions';
-                    if (s.apiKey) headers['Authorization'] = 'Bearer ' + s.apiKey;
-                    body = { model, temperature: 0.2, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
-                    pick = (j) => j.choices?.[0]?.message?.content || '';
+                if (s.preferChrome) {
+                    const st = await this.chromeStatus();
+                    if (st === 'available' || st === 'downloadable' || st === 'downloading') return { kind: 'chrome', label: this.PROVIDER_LABELS.chrome, status: st };
                 }
+                if (this.remoteConfigured(s)) return { kind: s.provider, label: `${this.PROVIDER_LABELS[s.provider]} (${this.modelFor(s)})` };
+                return null;
+            }
 
+            // make(level) builds the prompt at a size level (1 = compact ... 3 = minimal); the first that fits the quota is used.
+            static async completeChrome(system, make, onProgress) {
+                const session = await LanguageModel.create({
+                    ...this.CHROME_OPTS,
+                    initialPrompts: [{ role: 'system', content: system }],
+                    monitor(m) { m.addEventListener('downloadprogress', (e) => onProgress && onProgress(`Downloading Chrome's on-device model… ${Math.round(e.loaded * 100)}%`)); }
+                });
+                try {
+                    let user = null;
+                    for (const level of [1, 2, 3]) {
+                        const candidate = make(level);
+                        const need = typeof session.measureInputUsage === 'function' ? await session.measureInputUsage(candidate) : Math.ceil(candidate.length / 3.5);
+                        if ((session.inputUsage || 0) + need <= session.inputQuota - 300) { user = candidate; break; }
+                    }
+                    if (!user) throw new Error("Even the smallest prompt does not fit Chrome's on-device context window. Use a hosted provider for this one.");
+                    onProgress && onProgress("Thinking on-device…");
+                    const text = String(await session.prompt(user)).trim();
+                    if (!text) throw new Error('The on-device model returned an empty answer.');
+                    return { text, sources: [] };
+                } finally { try { session.destroy(); } catch (e) { /* ignore */ } }
+            }
+
+            static async post(url, headers, body) {
                 let res;
                 try { res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }); }
                 catch (e) { throw new Error(`Could not reach ${new URL(url).host} (${e.message}). Check the address, CORS, and that an https page is not calling an http server.`); }
@@ -1020,9 +1055,179 @@
                 let json = {};
                 try { json = JSON.parse(raw); } catch (e) { /* not JSON */ }
                 if (!res.ok) throw new Error(`${res.status} ${json.error?.message || json.error || raw.slice(0, 200)}`);
-                const text = pick(json).trim();
+                return json;
+            }
+
+            // Remote providers. Claude and Gemini can search the web server-side when "web" is on.
+            static async complete(system, user) {
+                const s = this.load();
+                const model = this.modelFor(s);
+                const sources = [];
+                const addSource = (url, label) => { if (url && !sources.some(x => x.url === url)) sources.push({ url, label: label || url }); };
+                let text = '';
+
+                if (s.provider === 'anthropic') {
+                    const url = 'https://api.anthropic.com/v1/messages';
+                    const headers = { 'Content-Type': 'application/json', 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+                    const toolType = /haiku|claude-3|4-5/.test(model) ? 'web_search_20250305' : 'web_search_20260209';
+                    const tools = s.webResearch ? [{ type: toolType, name: 'web_search', max_uses: 4 }] : undefined;
+                    let messages = [{ role: 'user', content: user }];
+                    for (let turn = 0; turn < 4; turn++) {
+                        const json = await this.post(url, headers, { model, max_tokens: 4000, system, messages, ...(tools ? { tools } : {}) });
+                        const blocks = json.content || [];
+                        blocks.forEach(b => { if (b.type === 'web_search_tool_result' && Array.isArray(b.content)) b.content.forEach(r => addSource(r.url, r.title)); });
+                        text += blocks.filter(b => b.type === 'text').map(b => b.text || '').join('');
+                        if (json.stop_reason !== 'pause_turn') break; // server-side tool loop hit its turn limit: send it back to continue
+                        messages = [...messages, { role: 'assistant', content: blocks }];
+                    }
+                } else if (s.provider === 'gemini') {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+                    const headers = { 'Content-Type': 'application/json', 'x-goog-api-key': s.apiKey };
+                    const json = await this.post(url, headers, {
+                        systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }],
+                        generationConfig: { temperature: 0.2 }, ...(s.webResearch ? { tools: [{ google_search: {} }] } : {})
+                    });
+                    const cand = (json.candidates || [])[0] || {};
+                    text = (cand.content?.parts || []).map(p => p.text || '').join('');
+                    (cand.groundingMetadata?.groundingChunks || []).forEach(c => addSource(c.web?.uri, c.web?.title));
+                } else {
+                    const url = s.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (s.apiKey) headers['Authorization'] = 'Bearer ' + s.apiKey;
+                    const json = await this.post(url, headers, { model, temperature: 0.2, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] });
+                    text = json.choices?.[0]?.message?.content || '';
+                }
+                text = text.trim();
                 if (!text) throw new Error('The model returned an empty answer.');
-                return text;
+                return { text, sources };
+            }
+        }
+
+        // ==========================================
+        // WEB RESEARCH (no AI needed)
+        // A page cannot search the open web (CORS), but these public vulnerability sources allow it:
+        // NVD, CISA KEV (GitHub mirror), FIRST EPSS, Red Hat, OSV.dev, endoflife.date.
+        // Only CVE ids and OS product names leave the browser, never hostnames or addresses.
+        // ==========================================
+
+        class WebResearch {
+            static cache = new Map();
+            static _kev = null;
+            static KEV_URL = 'https://cdn.jsdelivr.net/gh/cisagov/kev-data@develop/known_exploited_vulnerabilities.json';
+
+            static async getJSON(url, ms = 9000) {
+                const ctl = new AbortController();
+                const timer = setTimeout(() => ctl.abort(), ms);
+                try {
+                    const r = await fetch(url, { signal: ctl.signal });
+                    return r.ok ? await r.json() : null;
+                } catch (e) { return null; } finally { clearTimeout(timer); }
+            }
+
+            // The whole CISA catalogue (about 2 MB) is fetched once per session; no per-CVE calls, no rate limit.
+            static async kev() {
+                if (!this._kev) {
+                    this._kev = this.getJSON(this.KEV_URL, 20000).then(j => {
+                        const m = new Map();
+                        (j?.vulnerabilities || []).forEach(v => m.set(v.cveID, { added: v.dateAdded, due: v.dueDate, action: v.requiredAction, name: v.vulnerabilityName, ransomware: v.knownRansomwareCampaignUse }));
+                        return m;
+                    });
+                }
+                return this._kev;
+            }
+
+            static async nvd(id) {
+                const j = await this.getJSON(`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${encodeURIComponent(id)}`);
+                const c = j?.vulnerabilities?.[0]?.cve;
+                if (!c) return null;
+                const m = c.metrics?.cvssMetricV31?.[0] || c.metrics?.cvssMetricV40?.[0] || c.metrics?.cvssMetricV30?.[0];
+                return {
+                    desc: (c.descriptions || []).find(d => d.lang === 'en')?.value || '',
+                    cvss: m?.cvssData?.baseScore, sev: m?.cvssData?.baseSeverity,
+                    refs: (c.references || []).filter(r => (r.tags || []).some(t => /Patch|Vendor Advisory/.test(t))).slice(0, 3).map(r => r.url)
+                };
+            }
+
+            static async epss(ids) {
+                const j = await this.getJSON(`https://api.first.org/data/v1/epss?cve=${ids.map(encodeURIComponent).join(',')}`);
+                const out = {};
+                (j?.data || []).forEach(d => { out[d.cve] = { epss: parseFloat(d.epss), pct: parseFloat(d.percentile) }; });
+                return out;
+            }
+
+            // osHint: the host's OS string, so the fix for its own RHEL major version comes first.
+            static async redhat(id, osHint = '') {
+                const j = await this.getJSON(`https://access.redhat.com/hydra/rest/securitydata/cve/${encodeURIComponent(id)}.json`);
+                if (!j || !j.name) return null;
+                const major = (String(osHint).match(/Red Hat Enterprise Linux\D*(\d+)/i) || [])[1];
+                const all = j.affected_release || [];
+                const own = major ? all.filter(r => new RegExp('Enterprise Linux ' + major + '\\b', 'i').test(r.product_name || '') && !/\brt\b|real time/i.test(`${r.package} ${r.product_name}`)) : [];
+                const pick = (own.length ? own : all).slice(0, own.length ? 2 : 3);
+                return { severity: j.threat_severity, major: own.length ? major : '', fixed: pick.map(r => `${r.advisory || ''} ${r.package || ''}`.trim()).filter(Boolean) };
+            }
+
+            // OSV: fixed versions for open-source packages and distro packages.
+            static async osv(id) {
+                const j = await this.getJSON(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`);
+                if (!j) return null;
+                const out = new Map();
+                (j.affected || []).forEach(a => {
+                    const fixed = (a.ranges || []).flatMap(r => (r.events || []).map(e => e.fixed).filter(Boolean));
+                    if (a.package && fixed.length) { const k = `${a.package.name} (${a.package.ecosystem})`; if (!out.has(k)) out.set(k, fixed[0]); }
+                });
+                return [...out].slice(0, 3).map(([k, v]) => `${k}: fixed in ${v}`);
+            }
+
+            // OS lifecycle from endoflife.date, for the "no patch, end-of-life" detections.
+            static async osLifecycle(os) {
+                const map = [[/Red Hat Enterprise Linux\D*(\d+)/i, 'rhel', 'RHEL'], [/Windows Server\D*(\d{4})/i, 'windows-server', 'Windows Server'], [/Ubuntu\D*(\d+\.\d+)/i, 'ubuntu', 'Ubuntu'], [/Debian\D*(\d+)/i, 'debian', 'Debian'], [/AlmaLinux\D*(\d+)/i, 'almalinux', 'AlmaLinux'], [/CentOS\D*(\d+)/i, 'centos', 'CentOS']];
+                for (const [re, product, label] of map) {
+                    const m = String(os || '').match(re);
+                    if (!m) continue;
+                    const list = await this.getJSON(`https://endoflife.date/api/${product}.json`);
+                    const c = (list || []).find(x => String(x.cycle) === m[1]);
+                    if (!c) return null;
+                    const eol = c.eol;
+                    const past = eol === true || (typeof eol === 'string' && new Date(eol) < new Date());
+                    return { text: `${label} ${m[1]}: ${eol === false ? 'no end-of-life date yet' : (past ? 'end of life since ' + eol + ' (no more security fixes)' : 'end of life ' + eol)}${c.latest ? ', latest release ' + c.latest : ''}`, past, url: `https://endoflife.date/${product}` };
+                }
+                return null;
+            }
+
+            // ids: CVE ids; redhatIds: subset that are Red Hat detections. Returns structured rows plus prompt text.
+            static async lookup(ids, redhatIds = [], osHint = '') {
+                ids = [...new Set(ids)].slice(0, 8);
+                if (!ids.length) return { rows: [], text: '', sources: [] };
+                const key = ids.join(',') + '|' + redhatIds.join(',') + '|' + osHint;
+                if (this.cache.has(key)) return this.cache.get(key);
+                const nvdIds = ids.slice(0, 5), rhIds = redhatIds.filter(i => ids.includes(i)).slice(0, 4), osvIds = ids.slice(0, 6);
+                const [kev, epss, nvdRes, rhRes, osvRes] = await Promise.all([
+                    this.kev(), this.epss(ids),
+                    Promise.all(nvdIds.map(i => this.nvd(i))), Promise.all(rhIds.map(i => this.redhat(i, osHint))), Promise.all(osvIds.map(i => this.osv(i)))
+                ]);
+                const sources = [];
+                const rows = ids.map(id => {
+                    const n = nvdRes[nvdIds.indexOf(id)], r = rhRes[rhIds.indexOf(id)], o = osvRes[osvIds.indexOf(id)];
+                    const row = { id, nvd: n, kev: kev.get(id) || null, epss: epss[id] || null, redhat: r, osv: o && o.length ? o : null };
+                    if (n) sources.push({ label: `NVD ${id}`, url: `https://nvd.nist.gov/vuln/detail/${id}` });
+                    if (r) sources.push({ label: `Red Hat ${id}`, url: `https://access.redhat.com/security/cve/${id}` });
+                    if (row.osv) sources.push({ label: `OSV ${id}`, url: `https://osv.dev/vulnerability/${id}` });
+                    return row;
+                });
+                if (kev.size && rows.some(r => r.kev)) sources.push({ label: 'CISA KEV catalogue', url: 'https://www.cisa.gov/known-exploited-vulnerabilities-catalog' });
+                if (Object.keys(epss).length) sources.push({ label: 'FIRST EPSS', url: 'https://www.first.org/epss/' });
+                const text = rows.map(r => {
+                    const p = [];
+                    if (r.nvd) { p.push(`NVD: ${r.nvd.desc.replace(/\s+/g, ' ').slice(0, 260)}`); if (r.nvd.cvss) p.push(`CVSS ${r.nvd.cvss}${r.nvd.sev ? ' ' + r.nvd.sev : ''}`); if (r.nvd.refs.length) p.push(`vendor/patch refs: ${r.nvd.refs.join(' ')}`); }
+                    if (r.kev) p.push(`CISA KEV: added ${r.kev.added}, fix due ${r.kev.due}, required action: ${String(r.kev.action).slice(0, 160)}${r.kev.ransomware === 'Known' ? ', used in ransomware' : ''}`);
+                    if (r.epss) p.push(`EPSS ${(r.epss.epss * 100).toFixed(1)}% chance of exploitation in 30 days`);
+                    if (r.redhat) p.push(`Red Hat: ${r.redhat.severity || 'rated'}${r.redhat.fixed.length ? ', fixed in ' + r.redhat.fixed.join('; ') : ''}`);
+                    if (r.osv) p.push(`OSV: ${r.osv.join('; ')}`);
+                    return p.length ? `- ${r.id}: ${p.join(' | ')}` : null;
+                }).filter(Boolean).join('\n');
+                const result = { rows, text, sources };
+                this.cache.set(key, result);
+                return result;
             }
         }
 
@@ -1308,6 +1513,7 @@
                 this.currentView = null;
                 this.reportCtx = null;
                 this.aiCache = new Map();
+                this.intelCache = new Map();
                 this._vd = null;
             }
 
@@ -2191,7 +2397,7 @@
                 const patchGroups = groups.filter(g => g.patchable);
                 const patchDets = list.filter(d => d.patchable).length;
                 const t1 = groups.filter(g => g.tier === 1), t2 = groups.filter(g => g.tier === 2);
-                const solutionOf = (qid) => (vd.qmap.get(qid)?.solution || '').replace(/\s+/g, ' ').slice(0, 220);
+                const solutionOf = (qid) => plain(vd.qmap.get(qid)?.solution || '').replace(/\s+/g, ' ').slice(0, 220);
                 const item = (g) => `<li><a href="#" class="text-blue-700 hover:underline font-medium" data-q="${esc(g.qid)}" onclick="app.inspectQid(this.dataset.q); return false;">${esc(g.title)}</a>${solutionOf(g.qid) ? `<div class="text-xs text-gray-600">${linkify(esc(solutionOf(g.qid)))}</div>` : ''}</li>`;
                 let html = '<ul class="list-disc pl-5 space-y-2 text-sm text-gray-800">';
                 html += `<li><strong>${fmtNum(patchGroups.length)} patchable fix${patchGroups.length === 1 ? '' : 'es'}</strong> would remove ${fmtNum(patchDets)} of ${fmtNum(list.length)} detections (${Math.round(patchDets / list.length * 100)}%).</li>`;
@@ -2258,6 +2464,12 @@
                         </div>
                     </div>
 
+                    <div class="bg-white rounded-lg shadow border p-5">
+                        <div class="flex justify-between items-center mb-3"><h4 class="font-semibold text-gray-800">Public fix data <span class="font-normal text-gray-400 text-sm">(no AI needed)</span></h4>
+                            <span class="flex gap-2 print-hide"><button onclick="app.runIntel('asset', app.inspectCtx.name)" class="bg-slate-700 text-white px-3 py-1 text-xs rounded hover:bg-slate-600 shadow-sm font-medium">🌐 Look up</button><button onclick="app.runIntel('asset', app.inspectCtx.name, true)" title="Refresh" class="bg-white text-slate-700 border border-slate-300 px-2 py-1 text-xs rounded hover:bg-slate-100">↻</button></span></div>
+                        <div id="intel-out" class="text-sm"><p class="text-xs text-gray-500 italic">Pulls patch references, CISA KEV status and due date, exploit probability, and distro or package fix versions from NVD, CISA, FIRST, Red Hat and OSV.dev. Only CVE ids are sent.</p></div>
+                    </div>
+
                     <div class="bg-white rounded-lg shadow border overflow-hidden">
                         <div class="bg-gray-50 px-4 py-3 border-b flex flex-wrap gap-3 items-center justify-between">
                             <span class="font-semibold text-sm text-gray-700">Vulnerabilities <span id="insp-count" class="text-gray-500 font-normal"></span></span>
@@ -2280,6 +2492,8 @@
                 const out = document.getElementById('ai-out');
                 out.dataset.key = 'asset:' + name;
                 if (cached) out.innerHTML = cached;
+                const cachedIntel = this.intelCache.get('intel:asset:' + name);
+                if (cachedIntel) document.getElementById('intel-out').innerHTML = cachedIntel;
                 this.renderAssetRows();
             }
 
@@ -2331,6 +2545,7 @@
                 const oldest = Math.max(0, ...list.map(d => d.age));
                 const assets = [...new Set(list.map(d => d.asset))];
                 this.inspectCtx = { qid, vd };
+                setTimeout(() => { const c = this.intelCache.get('intel:qid:' + qid), el = document.getElementById('intel-out'); if (c && el) el.innerHTML = c; }, 0);
                 const kpi = (label, v) => `<div class="bg-gray-50 border p-3 rounded"><p class="text-[10px] uppercase font-semibold opacity-70">${label}</p><p class="text-xl font-bold">${v}</p></div>`;
                 const cves = (q.cves || []).map(c => `<a class="inline-block mr-1 mb-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-mono hover:bg-blue-100" target="_blank" rel="noopener noreferrer" href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(c.id)}">${esc(c.id)}${c.cvss ? ' · ' + c.cvss : ''}</a>`).join('');
 
@@ -2339,7 +2554,7 @@
                         <div class="flex flex-wrap justify-between gap-3">
                             <div class="max-w-3xl">
                                 <p class="text-xs font-mono text-gray-500">QID ${esc(qid)} • ${esc(q.category || '')}</p>
-                                <h3 class="text-xl font-bold text-gray-800">${esc(q.title)}</h3>
+                                <h3 class="text-xl font-bold text-gray-800">${esc(plain(q.title))}</h3>
                                 <div class="mt-2">${PriorityEngine.tierBadge(tier)} ${PriorityEngine.sevBadge(q.sev)} <span class="ml-2">${PriorityEngine.flagChips(q.rti, false)}</span></div>
                             </div>
                         </div>
@@ -2355,8 +2570,8 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div class="bg-white rounded-lg shadow border p-5 space-y-3 text-sm">
-                            <div><h4 class="font-semibold text-gray-800 mb-1">Vendor solution</h4><p class="text-gray-700 whitespace-pre-wrap break-words">${q.solution ? linkify(esc(q.solution)) : '<span class="italic text-gray-500">None provided.</span>'}</p></div>
-                            ${q.threat ? `<div><h4 class="font-semibold text-gray-800 mb-1">Threat</h4><p class="text-gray-700">${esc(q.threat)}</p></div>` : ''}
+                            <div><h4 class="font-semibold text-gray-800 mb-1">Vendor solution</h4><p class="text-gray-700 whitespace-pre-wrap break-words">${q.solution ? linkify(esc(plain(q.solution))) : '<span class="italic text-gray-500">None provided.</span>'}</p></div>
+                            ${q.threat ? `<div><h4 class="font-semibold text-gray-800 mb-1">Threat</h4><p class="text-gray-700">${esc(plain(q.threat))}</p></div>` : ''}
                         </div>
                         <div class="bg-blue-50 rounded-lg border border-blue-200 p-5">
                             <h4 class="font-semibold text-blue-900 mb-2 flex justify-between items-center">AI remediation plan
@@ -2367,6 +2582,12 @@
                             </h4>
                             <div id="ai-out" data-key="qid:${esc(qid)}" class="text-sm text-gray-800">${this.aiCache.get('qid:' + qid) || '<p class="text-gray-600 italic">Click Generate for a rollout plan across the affected assets: order, change risk, steps per OS and how to verify.</p>'}</div>
                         </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow border p-5">
+                        <div class="flex justify-between items-center mb-3"><h4 class="font-semibold text-gray-800">Public fix data <span class="font-normal text-gray-400 text-sm">(no AI needed)</span></h4>
+                            <span class="flex gap-2 print-hide"><button onclick="app.runIntel('qid', app.inspectCtx.qid)" class="bg-slate-700 text-white px-3 py-1 text-xs rounded hover:bg-slate-600 shadow-sm font-medium">🌐 Look up</button><button onclick="app.runIntel('qid', app.inspectCtx.qid, true)" title="Refresh" class="bg-white text-slate-700 border border-slate-300 px-2 py-1 text-xs rounded hover:bg-slate-100">↻</button></span></div>
+                        <div id="intel-out" class="text-sm"><p class="text-xs text-gray-500 italic">Pulls patch references, CISA KEV status and due date, exploit probability, and distro or package fix versions from NVD, CISA, FIRST, Red Hat and OSV.dev. Only CVE ids are sent.</p></div>
                     </div>
 
                     <div class="bg-white rounded-lg shadow border overflow-hidden">
@@ -2393,65 +2614,171 @@
             static AI_SYSTEM = `You are a senior infrastructure security engineer advising a platform operations team on remediating vulnerabilities reported by Qualys.
 Use ONLY the data supplied. Never invent CVE numbers, patch versions, KB numbers or advisories; if the vendor solution is missing or unclear, say so.
 Be practical and specific to the operating systems and service roles shown (take extra care with domain controllers, databases and backup servers: snapshot first, stagger the rollout, use a maintenance window).
-Prefer fixes that clear many detections at once. Priority labels: "Fix now" = known exploited (CISA KEV, active attacks, ransomware, wormable, zero-day); "This sprint" = high QVS or remote code execution with a public exploit.
+Prefer fixes that clear many detections at once. When a "Public intelligence" block is supplied (NVD, CISA KEV, EPSS, Red Hat, OSV), use it and name the CVE it comes from; if web search results are available, cite the source. Never state a fixed version that is not in the supplied data or search results. Priority labels: "Fix now" = known exploited (CISA KEV, active attacks, ransomware, wormable, zero-day); "This sprint" = high QVS or remote code execution with a public exploit.
 Write in British English. Use Markdown headings, short bullet lists and numbered steps. Do not use tables. Keep it under about 450 words.
 Finish with a "Verify" section saying how to confirm in Qualys (agent check-in or rescan) that the detections have closed.`;
 
-            async buildAIPrompt(kind, id) {
-                const vd = await this.getVulnData();
-                const anon = new Anonymiser(AIService.load().anonymise);
-                const reg = new Map(StorageService.load(StorageService.KEYS.ASSET_REGISTER).map(r => [r.normalizedName, r]));
-                const sums = new Map((StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).map(s => [s.name, s]));
-                const meta = this.loadVulnMeta();
-                const caveat = meta.truncated ? 'Data caveat: the Qualys export was truncated, so the list may be incomplete.\n' : '';
-                const short = (s, n) => String(s || '').replace(/\s+/g, ' ').slice(0, n);
-                const flags = (q) => (q.rti || []).filter(t => PriorityEngine.SHORT_FLAGS[t]).map(t => PriorityEngine.SHORT_FLAGS[t]).join(', ') || 'none';
-                const assetLine = (name) => {
-                    const r = reg.get(name) || {}, s = sums.get(name) || {};
-                    return `${anon.alias(name)} | OS: ${short(r.os, 70) || 'unknown'} | service: ${r.service || 'Unclassified'} | owner: ${r.owner || 'Unknown'} | criticality ${s.criticality || '?'}/5 | TruRisk ${s.truRisk || '?'}`;
-                };
-                const groupLine = (g) => {
-                    const q = vd.qmap.get(g.qid) || {};
-                    const cves = (q.cves || []).slice(0, 4).map(c => c.id).join(', ');
-                    return `- [${PriorityEngine.LABELS[g.tier]}] QID ${g.qid} | ${short(q.title, 110)} | CVEs: ${cves || 'none'}${(q.cveCount || 0) > 4 ? ` (+${q.cveCount - 4})` : ''} | QVS ${g.qvs || '?'} | flags: ${flags(q)} | patchable: ${g.patchable ? 'yes' : 'no'} | assets: ${g.assets.size} | oldest ${g.maxAge}d | vendor solution: ${short(q.solution, 280) || 'none'}`;
-                };
-
-                if (kind === 'asset') {
-                    const list = vd.byAsset.get(id) || [];
-                    const groups = PriorityEngine.fixGroups(list, vd.qmap);
-                    const user = `Asset (one host):\n${assetLine(id)}\n${caveat}\nThe host has ${list.length} detections in ${groups.length} distinct fixes. The ${Math.min(30, groups.length)} highest-priority fixes:\n${groups.slice(0, 30).map(groupLine).join('\n')}\n\nTask: give a remediation plan for this host. Cover the fix order and why, what to do for the operating system shown, change risk for its service role, what cannot be patched and the compensating control, and how to verify.`;
-                    return { system: App.AI_SYSTEM, user, anon };
-                }
+            // Which CVEs are worth looking up for an asset / vulnerability / report.
+            pickResearch(vd, kind, id, n) {
+                const items = [];
+                let os = '';
                 if (kind === 'qid') {
                     const q = vd.qmap.get(id) || {};
-                    const list = vd.byQid.get(id) || [];
-                    const assets = [...new Set(list.map(d => d.asset))];
-                    const user = `Vulnerability: QID ${id} | ${short(q.title, 160)}\nCVEs: ${(q.cves || []).slice(0, 8).map(c => `${c.id} (CVSS ${c.cvss || '?'})`).join(', ') || 'none'}${(q.cveCount || 0) > 8 ? ` (+${q.cveCount - 8} more)` : ''}\nQualys real-time intelligence: ${(q.rti || []).join(', ') || 'none'}\nThreat: ${short(q.threat, 400)}\nVendor solution: ${short(q.solution, 900) || 'none provided'}\nPatchable: ${q.patchable ? 'yes' : 'no'} | patch released: ${q.patchReleased || 'unknown'}\n${caveat}\nAffected assets (${assets.length}${assets.length > 40 ? ', first 40 by criticality shown' : ''}):\n${assets.sort((a, b) => ((sums.get(b)?.criticality || 0) - (sums.get(a)?.criticality || 0))).slice(0, 40).map(assetLine).join('\n')}\n\nTask: explain the risk in plain terms, then give a rollout plan across these assets: which to do first and why, batching by service role and OS, change risk, concrete steps per operating system family seen, what to do where no patch exists, and how to verify.`;
-                    return { system: App.AI_SYSTEM, user, anon };
+                    (q.cves || []).slice(0, n).forEach(c => items.push({ cve: c.id, q }));
+                } else {
+                    const groups = kind === 'asset' ? PriorityEngine.fixGroups(vd.byAsset.get(id) || [], vd.qmap) : (this.reportCtx?.groups || []);
+                    groups.slice(0, n).forEach(g => { const q = vd.qmap.get(g.qid) || {}; if (q.cves && q.cves[0]) items.push({ cve: q.cves[0].id, q }); });
+                    if (kind === 'asset') os = (StorageService.load(StorageService.KEYS.ASSET_REGISTER).find(r => r.normalizedName === id) || {}).os || '';
                 }
-                // report
-                const ctx = this.reportCtx || { groups: [], assets: [], dets: [], scope: 'ALL' };
-                const t1 = ctx.dets.filter(d => d.tier === 1).length;
-                const user = `Team report scope: ${ctx.scope === 'ALL' ? 'whole estate' : ctx.scope + ' team'}.\n${caveat}Assets with findings: ${ctx.assets.length} of ${ctx.inScope.length} in scope. Open detections: ${ctx.dets.length}. Fix-now (known exploited) detections: ${t1}. Distinct fixes: ${ctx.groups.length}.\n\nTop fixes (ranked by priority, then assets affected x QVS):\n${ctx.groups.slice(0, 15).map(groupLine).join('\n')}\n\nHighest-risk assets (criticality, then TruRisk):\n${ctx.assets.slice(0, 10).map(a => `${assetLine(a.name)} | detections ${a.detections} | fix-now ${a.t1}`).join('\n')}\n\nTask: write a 30-day remediation plan for this team, week by week. Say what to patch first and why, how to batch the work by service role to limit outage risk, what needs a risk acceptance or compensating control, and which data gaps to close.`;
-                return { system: App.AI_SYSTEM, user, anon };
+                return { items, os };
+            }
+
+            // "Public fix data": patch references, CISA KEV, exploit probability, distro and package fix versions. No AI involved.
+            async intelHTML(kind, id) {
+                const vd = await this.getVulnData();
+                const { items, os } = this.pickResearch(vd, kind, id, kind === 'qid' ? 8 : 6);
+                if (!items.length) return '<p class="text-xs text-gray-500">No CVEs on record to look up here.</p>';
+                const [r, life] = await Promise.all([
+                    WebResearch.lookup(items.map(i => i.cve), items.filter(i => i.q.category === 'RedHat').map(i => i.cve), os),
+                    os ? WebResearch.osLifecycle(os) : Promise.resolve(null)
+                ]);
+                if (!r.rows.some(x => x.nvd || x.kev || x.epss || x.redhat || x.osv)) return '<p class="text-xs text-amber-800">The public sources could not be reached (offline, or blocked by a proxy). The vendor solution above still applies.</p>';
+                const link = (u) => `<a class="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer" href="${esc(u)}">${esc(u.replace(/^https?:\/\//, '').slice(0, 52))}</a>`;
+                const rows = r.rows.map(x => {
+                    const fix = [];
+                    if (x.redhat) fix.push(`<div><strong>Red Hat${x.redhat.major ? ' (RHEL ' + esc(x.redhat.major) + ')' : ''}:</strong> ${esc(x.redhat.severity || '')}${x.redhat.fixed.length ? ' fixed in ' + esc(x.redhat.fixed.join('; ')) : ''}</div>`);
+                    if (x.osv) fix.push(...x.osv.map(o => `<div><strong>OSV:</strong> ${esc(o)}</div>`));
+                    if (x.nvd && x.nvd.refs.length) fix.push(...x.nvd.refs.slice(0, 2).map(u => `<div>${link(u)}</div>`));
+                    return `<tr class="align-top">
+                        <td class="px-2 py-2 font-mono text-xs whitespace-nowrap"><a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(x.id)}">${esc(x.id)}</a></td>
+                        <td class="px-2 py-2 text-center font-mono">${x.nvd && x.nvd.cvss ? esc(x.nvd.cvss) : '-'}</td>
+                        <td class="px-2 py-2 text-xs">${x.kev ? `<span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 font-bold text-[10px]">KEV</span> due ${esc(x.kev.due)}<div class="text-gray-600">${esc(String(x.kev.action).slice(0, 140))}</div>` : '<span class="text-gray-400">not listed</span>'}</td>
+                        <td class="px-2 py-2 text-xs text-right font-mono">${x.epss ? (x.epss.epss * 100).toFixed(1) + '%' : '-'}</td>
+                        <td class="px-2 py-2 text-xs">${fix.join('') || '<span class="text-gray-400">no fix data found</span>'}</td></tr>`;
+                }).join('');
+                return `${life ? `<p class="text-xs mb-2 ${life.past ? 'text-red-700 font-semibold' : 'text-gray-700'}">OS lifecycle: ${esc(life.text)} (<a class="underline" target="_blank" rel="noopener noreferrer" href="${esc(life.url)}">endoflife.date</a>)</p>` : ''}
+                    <div class="overflow-auto"><table class="min-w-full text-left"><thead class="text-[10px] uppercase text-gray-500 border-b"><tr><th class="px-2 py-1">CVE</th><th class="px-2 py-1 text-center">CVSS</th><th class="px-2 py-1">CISA KEV</th><th class="px-2 py-1 text-right">EPSS</th><th class="px-2 py-1">Fix data</th></tr></thead><tbody class="divide-y">${rows}</tbody></table></div>
+                    <p class="text-[11px] text-gray-500 mt-2">Live from NVD, the CISA KEV catalogue, FIRST EPSS, Red Hat and OSV.dev; only CVE ids and the OS name were sent. The vendor solution above is still the authoritative fix.</p>`;
+            }
+
+            async runIntel(kind, id, force = false) {
+                const key = `intel:${kind}:${id}`;
+                const el = document.getElementById('intel-out');
+                if (!force && this.intelCache.has(key)) { el.innerHTML = this.intelCache.get(key); return; }
+                el.dataset.key = key;
+                el.innerHTML = '<p class="text-xs text-gray-500 italic">Looking up NVD, CISA KEV, EPSS, Red Hat and OSV…</p>';
+                const html = await this.intelHTML(kind, id).catch(e => `<p class="text-xs text-red-700">Lookup failed: ${esc(e.message)}</p>`);
+                this.intelCache.set(key, html);
+                const now = document.getElementById('intel-out');
+                if (now && now.dataset.key === key) now.innerHTML = html;
+            }
+
+            // Builds the prompt in size levels (0 = full, 1-3 = progressively smaller for Chrome's small on-device window).
+            async prepareAI(kind, id, onDevice) {
+                const vd = await this.getVulnData();
+                const s = AIService.load();
+                const anon = new Anonymiser(s.anonymise && !onDevice); // nothing leaves the browser on-device, so real names are fine
+                const reg = new Map(StorageService.load(StorageService.KEYS.ASSET_REGISTER).map(r => [r.normalizedName, r]));
+                const sums = new Map((StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).map(x => [x.name, x]));
+                const meta = this.loadVulnMeta();
+                const caveat = meta.truncated ? 'Data caveat: the Qualys export was truncated, so the list may be incomplete.\n' : '';
+                const LIM = [
+                    { groups: 30, sol: 280, cves: 4, assets: 40, res: 420 },
+                    { groups: 8, sol: 120, cves: 2, assets: 12, res: 170 },
+                    { groups: 4, sol: 60, cves: 1, assets: 6, res: 100 },
+                    { groups: 2, sol: 0, cves: 1, assets: 3, res: 0 }
+                ];
+                const short = (t, n) => plain(t).replace(/\s+/g, ' ').slice(0, n);
+                const flags = (q) => (q.rti || []).filter(t => PriorityEngine.SHORT_FLAGS[t]).map(t => PriorityEngine.SHORT_FLAGS[t]).join(', ') || 'none';
+                const assetLine = (name) => {
+                    const r = reg.get(name) || {}, x = sums.get(name) || {};
+                    return `${anon.alias(name)} | OS: ${short(r.os, 70) || 'unknown'} | service: ${r.service || 'Unclassified'} | owner: ${r.owner || 'Unknown'} | criticality ${x.criticality || '?'}/5 | TruRisk ${x.truRisk || '?'}`;
+                };
+                const groupLine = (g, L) => {
+                    const q = vd.qmap.get(g.qid) || {};
+                    const cves = (q.cves || []).slice(0, L.cves).map(c => c.id).join(', ');
+                    const sol = L.sol ? ` | vendor solution: ${short(q.solution, L.sol) || 'none'}` : '';
+                    return `- [${PriorityEngine.LABELS[g.tier]}] QID ${g.qid} | ${short(q.title, 110)} | CVEs: ${cves || 'none'}${(q.cveCount || 0) > L.cves ? ` (+${q.cveCount - L.cves})` : ''} | QVS ${g.qvs || '?'} | flags: ${flags(q)} | patchable: ${g.patchable ? 'yes' : 'no'} | assets: ${g.assets.size} | oldest ${g.maxAge}d${sol}`;
+                };
+
+                // Public intelligence for the CVEs that matter most here (CVE ids only leave the browser).
+                const groupsFor = kind === 'asset' ? PriorityEngine.fixGroups(vd.byAsset.get(id) || [], vd.qmap) : (kind === 'report' ? (this.reportCtx?.groups || []) : []);
+                const { items, os } = this.pickResearch(vd, kind, id, kind === 'report' ? 5 : 4);
+                const research = s.webResearch && items.length
+                    ? await WebResearch.lookup(items.map(i => i.cve), items.filter(i => i.q.category === 'RedHat').map(i => i.cve), os)
+                    : { text: '', sources: [] };
+
+                const make = (level) => {
+                    const L = LIM[level];
+                    const intel = research.text && L.res
+                        ? `\nPublic intelligence retrieved just now (NVD, FIRST EPSS, Red Hat). Use it, and name the CVE when you rely on it:\n${research.text.split('\n').map(l => l.slice(0, L.res)).join('\n')}\n`
+                        : '';
+                    if (kind === 'asset') {
+                        const list = vd.byAsset.get(id) || [];
+                        const groups = groupsFor;
+                        return `Asset (one host):\n${assetLine(id)}\n${caveat}\nThe host has ${list.length} detections in ${groups.length} distinct fixes. The ${Math.min(L.groups, groups.length)} highest-priority fixes:\n${groups.slice(0, L.groups).map(g => groupLine(g, L)).join('\n')}\n${intel}\nTask: give a remediation plan for this host. Cover the fix order and why, what to do for the operating system shown, change risk for its service role, what cannot be patched and the compensating control, and how to verify.`;
+                    }
+                    if (kind === 'qid') {
+                        const q = vd.qmap.get(id) || {};
+                        const list = vd.byQid.get(id) || [];
+                        const assets = [...new Set(list.map(d => d.asset))].sort((a, b) => (sums.get(b)?.criticality || 0) - (sums.get(a)?.criticality || 0));
+                        return `Vulnerability: QID ${id} | ${short(q.title, 160)}\nCVEs: ${(q.cves || []).slice(0, L.cves + 4).map(c => `${c.id} (CVSS ${c.cvss || '?'})`).join(', ') || 'none'}${(q.cveCount || 0) > L.cves + 4 ? ` (+${q.cveCount - L.cves - 4} more)` : ''}\nQualys real-time intelligence: ${(q.rti || []).join(', ') || 'none'}\nThreat: ${short(q.threat, L.sol ? 400 : 0)}\nVendor solution: ${short(q.solution, L.sol ? Math.max(L.sol * 3, 200) : 0) || 'none provided'}\nPatchable: ${q.patchable ? 'yes' : 'no'} | patch released: ${q.patchReleased || 'unknown'}\n${caveat}${intel}\nAffected assets (${assets.length}${assets.length > L.assets ? `, first ${L.assets} by criticality shown` : ''}):\n${assets.slice(0, L.assets).map(assetLine).join('\n')}\n\nTask: explain the risk in plain terms, then give a rollout plan across these assets: which to do first and why, batching by service role and OS, change risk, concrete steps per operating system family seen, what to do where no patch exists, and how to verify.`;
+                    }
+                    const ctx = this.reportCtx || { groups: [], assets: [], dets: [], inScope: [], scope: 'ALL' };
+                    const t1 = ctx.dets.filter(d => d.tier === 1).length;
+                    return `Team report scope: ${ctx.scope === 'ALL' ? 'whole estate' : ctx.scope + ' team'}.\n${caveat}Assets with findings: ${ctx.assets.length} of ${ctx.inScope.length} in scope. Open detections: ${ctx.dets.length}. Fix-now (known exploited) detections: ${t1}. Distinct fixes: ${ctx.groups.length}.\n\nTop fixes (ranked by priority, then assets affected x QVS):\n${ctx.groups.slice(0, Math.min(L.groups, 15)).map(g => groupLine(g, L)).join('\n')}\n\nHighest-risk assets (criticality, then TruRisk):\n${ctx.assets.slice(0, Math.max(3, Math.min(10, L.assets))).map(a => `${assetLine(a.name)} | detections ${a.detections} | fix-now ${a.t1}`).join('\n')}\n${intel}\nTask: write a 30-day remediation plan for this team, week by week. Say what to patch first and why, how to batch the work by service role to limit outage risk, what needs a risk acceptance or compensating control, and which data gaps to close.`;
+                };
+                return { make, anon, research };
             }
 
             async runAI(kind, id, force = false) {
                 const key = kind === 'report' ? (document.getElementById('rpt-ai-out').dataset.key) : `${kind}:${id}`;
                 const outId = kind === 'report' ? 'rpt-ai-out' : 'ai-out';
                 const out = document.getElementById(outId);
-                if (!AIService.configured()) {
-                    out.innerHTML = '<div class="rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">No AI provider is set up yet. <button onclick="app.openAISettings()" class="underline font-semibold">Open AI Settings</button></div>';
+                const status = (t) => { const el = document.getElementById(outId); if (el && el.dataset.key === key) el.innerHTML = `<p class="text-gray-600 italic">${esc(t)}</p>`; };
+
+                const eng = await AIService.resolve();
+                if (!eng) {
+                    const st = await AIService.chromeStatus();
+                    out.innerHTML = `<div class="rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">No AI engine is available. Chrome's built-in model: ${esc(AIService.chromeStatusText(st))} Or set up a hosted/local provider. <button onclick="app.openAISettings()" class="underline font-semibold">Open AI Settings</button></div>`;
+                    if (kind !== 'report') {
+                        out.insertAdjacentHTML('beforeend', '<p class="text-xs text-gray-500 italic mt-3">Showing public fix data instead (no AI needed)…</p>');
+                        const intel = await this.intelHTML(kind, id).catch(() => '');
+                        const now = document.getElementById(outId);
+                        if (now) now.innerHTML = now.innerHTML.replace(/<p class="text-xs text-gray-500 italic mt-3">.*?<\/p>/, '') + `<div class="mt-3 bg-white border rounded p-3"><h5 class="font-semibold text-sm mb-2">Public fix data</h5>${intel}</div>`;
+                    }
                     return;
                 }
                 if (!force && this.aiCache.has(key)) { out.innerHTML = this.aiCache.get(key); return; }
+
                 const s = AIService.load();
-                out.innerHTML = `<p class="text-gray-600 italic">Asking ${esc(AIService.PROVIDER_LABELS[s.provider])} (${esc(AIService.modelFor(s))})… this can take up to a minute.</p>`;
                 let html;
                 try {
-                    const { system, user, anon } = await this.buildAIPrompt(kind, id);
-                    const text = anon.restore(await AIService.complete(system, user));
-                    html = `<div>${mdToHtml(text)}</div><p class="text-[11px] text-gray-500 mt-3 border-t pt-2">Generated by ${esc(AIService.modelFor(s))} from the imported Qualys data${s.anonymise ? ' (hostnames were pseudonymised before sending)' : ''}. Check against the vendor advisory before applying.</p>`;
+                    status(s.webResearch ? 'Looking up public vulnerability intelligence…' : `Asking ${eng.label}…`);
+                    let used = eng, res, prep;
+                    if (eng.kind === 'chrome') {
+                        try {
+                            prep = await this.prepareAI(kind, id, true);
+                            res = await AIService.completeChrome(App.AI_SYSTEM, prep.make, status);
+                        } catch (e) {
+                            if (!AIService.remoteConfigured(s)) throw e;
+                            console.warn('[AI] on-device failed, falling back', e);
+                            used = { kind: s.provider, label: `${AIService.PROVIDER_LABELS[s.provider]} (${AIService.modelFor(s)})`, note: `On-device model failed (${e.message}).` };
+                            status(`${used.note} Trying ${used.label}…`);
+                            prep = null;
+                        }
+                    }
+                    if (!res) {
+                        prep = await this.prepareAI(kind, id, false);
+                        status(`Asking ${used.label}… this can take up to a minute.`);
+                        res = await AIService.complete(App.AI_SYSTEM, prep.make(0));
+                    }
+                    const text = prep.anon.restore(res.text);
+                    const sources = [...prep.research.sources, ...res.sources];
+                    const where = used.kind === 'chrome' ? 'on-device (nothing but public CVE ids left the browser)' : (s.anonymise ? 'hostnames pseudonymised before sending' : 'real hostnames sent');
+                    html = `<div>${mdToHtml(text)}</div>
+                        ${sources.length ? `<p class="text-[11px] text-gray-600 mt-3"><strong>Sources:</strong> ${sources.slice(0, 12).map(x => `<a class="text-blue-600 underline mr-2" target="_blank" rel="noopener noreferrer" href="${esc(x.url)}">${esc(String(x.label).slice(0, 48))}</a>`).join('')}</p>` : ''}
+                        <p class="text-[11px] text-gray-500 mt-2 border-t pt-2">Generated by ${esc(used.label)}; ${where}. ${used.note ? esc(used.note) + ' ' : ''}Check against the vendor advisory before applying.</p>`;
                     this.aiCache.set(key, html);
                 } catch (e) {
                     console.error('[AI]', e);
@@ -2461,7 +2788,7 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 if (el && el.dataset.key === key) el.innerHTML = html;
             }
 
-            openAISettings() {
+            async openAISettings() {
                 const s = AIService.load();
                 const $ = (id) => document.getElementById(id);
                 $('ai-provider').value = s.provider;
@@ -2469,9 +2796,13 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 $('ai-baseurl').value = s.baseUrl;
                 $('ai-key').value = s.apiKey;
                 $('ai-anon').checked = s.anonymise;
+                $('ai-prefer-chrome').checked = s.preferChrome;
+                $('ai-web').checked = s.webResearch;
                 $('ai-test-result').textContent = '';
+                $('ai-chrome-status').textContent = 'Checking…';
                 this.aiProviderChanged();
                 $('modal-ai-settings').classList.remove('hidden');
+                AIService.chromeStatus().then(st => { $('ai-chrome-status').textContent = AIService.chromeStatusText(st); });
             }
 
             aiProviderChanged() {
@@ -2481,9 +2812,13 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                 document.getElementById('ai-key-label').textContent = p === 'openai' ? 'API key (optional)' : 'API key';
             }
 
-            saveAISettings() {
+            readAISettings() {
                 const $ = (id) => document.getElementById(id);
-                AIService.save({ provider: $('ai-provider').value, model: $('ai-model').value.trim(), baseUrl: $('ai-baseurl').value.trim(), apiKey: $('ai-key').value.trim(), anonymise: $('ai-anon').checked });
+                return { provider: $('ai-provider').value, model: $('ai-model').value.trim(), baseUrl: $('ai-baseurl').value.trim(), apiKey: $('ai-key').value.trim(), anonymise: $('ai-anon').checked, preferChrome: $('ai-prefer-chrome').checked, webResearch: $('ai-web').checked };
+            }
+
+            saveAISettings() {
+                AIService.save(this.readAISettings());
                 this.aiCache.clear();
                 this.closeModals();
             }
@@ -2491,17 +2826,18 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
             async testAISettings() {
                 const $ = (id) => document.getElementById(id);
                 const prev = AIService.load();
-                AIService.save({ provider: $('ai-provider').value, model: $('ai-model').value.trim(), baseUrl: $('ai-baseurl').value.trim(), apiKey: $('ai-key').value.trim(), anonymise: $('ai-anon').checked });
-                $('ai-test-result').className = 'text-xs mt-2 text-gray-600';
-                $('ai-test-result').textContent = 'Testing…';
+                AIService.save(this.readAISettings());
+                const say = (cls, t) => { $('ai-test-result').className = 'text-xs mt-2 ' + cls; $('ai-test-result').textContent = t; };
+                say('text-gray-600', 'Testing…');
                 try {
-                    const t = await AIService.complete('Reply with the single word OK.', 'ping');
-                    $('ai-test-result').className = 'text-xs mt-2 text-green-700';
-                    $('ai-test-result').textContent = 'Connected. Reply: ' + t.slice(0, 40);
-                } catch (e) {
-                    $('ai-test-result').className = 'text-xs mt-2 text-red-700';
-                    $('ai-test-result').textContent = e.message;
-                } finally { AIService.save(prev); }
+                    const eng = await AIService.resolve();
+                    if (!eng) throw new Error("No engine available: Chrome's built-in model is not usable here and no hosted provider is complete.");
+                    const r = eng.kind === 'chrome'
+                        ? await AIService.completeChrome('Reply with the single word OK.', () => 'ping', (t) => say('text-gray-600', t))
+                        : await AIService.complete('Reply with the single word OK.', 'ping');
+                    say('text-green-700', `Connected via ${eng.label}. Reply: ${r.text.slice(0, 40)}`);
+                } catch (e) { say('text-red-700', e.message); }
+                finally { AIService.save(prev); }
             }
 
             async openBulkRiskModal(source) {
