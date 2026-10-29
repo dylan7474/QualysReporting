@@ -280,22 +280,86 @@
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center" id="vuln-summary-metrics"></div>
                 
-                <div class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 mt-2">
+                <div class="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6 mt-2">
                     <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top Assets by Weighted Risk</h4>
-                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-assets" class="divide-y"></tbody></table></div>
+                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Highest Operational Risk Assets</h4>
+                        <div class="overflow-auto flex-1">
+                            <table class="min-w-full text-sm text-left whitespace-nowrap">
+                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-4 py-2 font-medium">Asset</th>
+                                        <th class="px-4 py-2 font-medium">Owner</th>
+                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
+                                        <th class="px-4 py-2 font-medium text-right">Weighted Risk</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vuln-top-assets" class="divide-y"></tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top Patchable Assets</h4>
-                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-patchable" class="divide-y"></tbody></table></div>
+                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Patching Priority Queue</h4>
+                        <div class="overflow-auto flex-1">
+                            <table class="min-w-full text-sm text-left whitespace-nowrap">
+                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-4 py-2 font-medium">Asset</th>
+                                        <th class="px-4 py-2 font-medium">Owner</th>
+                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
+                                        <th class="px-4 py-2 font-medium text-right">Patchable Risk</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vuln-top-patchable" class="divide-y"></tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top CVEs (Weighted Impact)</h4>
-                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-cves" class="divide-y"></tbody></table></div>
+                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Top Teams By Risk</h4>
+                        <div class="overflow-auto flex-1">
+                            <table class="min-w-full text-sm text-left whitespace-nowrap">
+                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-4 py-2 font-medium">Team</th>
+                                        <th class="px-4 py-2 font-medium">Asset Count</th>
+                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
+                                        <th class="px-4 py-2 font-medium text-right">Combined Risk</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vuln-top-teams" class="divide-y"></tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top Services by Risk</h4>
-                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-services" class="divide-y"></tbody></table></div>
+                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Highest Operational Risk Services</h4>
+                        <div class="overflow-auto flex-1">
+                            <table class="min-w-full text-sm text-left whitespace-nowrap">
+                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-4 py-2 font-medium">Service</th>
+                                        <th class="px-4 py-2 font-medium">Asset Count</th>
+                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
+                                        <th class="px-4 py-2 font-medium text-right">Weighted Risk</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vuln-top-services" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col lg:col-span-2">
+                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Highest Impact Vulnerabilities</h4>
+                        <div class="overflow-auto flex-1">
+                            <table class="min-w-full text-sm text-left whitespace-nowrap">
+                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-4 py-2 font-medium">CVE</th>
+                                        <th class="px-4 py-2 font-medium w-full">Title</th>
+                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
+                                        <th class="px-4 py-2 font-medium text-right">Weighted Impact</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vuln-top-cves" class="divide-y"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -405,7 +469,7 @@
                     vulnServiceSummary: this.load(this.KEYS.VULN_SERVICE_SUMMARY),
                     vulnCveSummary: this.load(this.KEYS.VULN_CVE_SUMMARY),
                     exportDate: new Date().toISOString(),
-                    version: '2.3'
+                    version: '2.4'
                 };
                 const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -1161,7 +1225,6 @@
 
             renderVulnDashboard() {
                 const assetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
-                const serviceSummary = StorageService.load(StorageService.KEYS.VULN_SERVICE_SUMMARY) || [];
                 const cveSummary = StorageService.load(StorageService.KEYS.VULN_CVE_SUMMARY) || [];
 
                 const { patchable, severity, owner, exposure } = this.vulnState.filters;
@@ -1184,22 +1247,70 @@
                     return a.riskTotal;
                 };
 
+                let totalFindings = 0;
+                let totalRisk = 0;
+                let totalPatchableRisk = 0;
+                let totalCriticalFindings = 0;
+
+                const teamMap = {};
+                const svcMap = {};
+
+                filteredAssets.forEach(a => {
+                    totalFindings += a.findingsTotal;
+                    totalPatchableRisk += a.riskPatchable;
+                    totalCriticalFindings += a.findingsCritical;
+                    
+                    const r = getRisk(a);
+                    totalRisk += r;
+
+                    if (r > 0) {
+                        if (!teamMap[a.owner]) teamMap[a.owner] = { owner: a.owner, count: 0, risk: 0 };
+                        teamMap[a.owner].count++;
+                        teamMap[a.owner].risk += r;
+
+                        if (!svcMap[a.service]) svcMap[a.service] = { service: a.service, count: 0, risk: 0 };
+                        svcMap[a.service].count++;
+                        svcMap[a.service].risk += r;
+                    }
+                });
+
                 const riskMap = filteredAssets.map(a => ({ name: a.name, owner: a.owner, risk: getRisk(a) })).filter(a => a.risk > 0);
                 const patchableRiskMap = filteredAssets.map(a => ({ name: a.name, owner: a.owner, risk: a.riskPatchable })).filter(a => a.risk > 0);
+                const teams = Object.values(teamMap);
+                const svcs = Object.values(svcMap);
+                const cves = cveSummary;
                 
                 const getTop = (arr) => arr.sort((x, y) => y.risk - x.risk).slice(0, 10);
-                
-                document.getElementById('vuln-top-assets').innerHTML = getTop(riskMap).map(t => `<tr><td class="px-4 py-2">${t.name}</td><td class="px-4 py-2">${t.owner}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
-                document.getElementById('vuln-top-patchable').innerHTML = getTop(patchableRiskMap).map(t => `<tr><td class="px-4 py-2">${t.name}</td><td class="px-4 py-2">${t.owner}</td><td class="px-4 py-2 text-orange-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
-                document.getElementById('vuln-top-cves').innerHTML = getTop(cveSummary).map(t => `<tr><td class="px-4 py-2 font-mono text-xs">${t.cve}</td><td class="px-4 py-2 text-xs truncate max-w-xs" title="${t.title}">${t.title || 'N/A'}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
-                document.getElementById('vuln-top-services').innerHTML = getTop(serviceSummary).map(t => `<tr><td class="px-4 py-2">${t.service}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
-                
+                const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+                const badge = (r) => {
+                    if (r > 1000000) return `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Critical</span>`;
+                    if (r >= 250000) return `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">High</span>`;
+                    if (r >= 50000) return `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Medium</span>`;
+                    return `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Low</span>`;
+                };
+                const empty = (c, m) => `<tr><td colspan="${c}" class="px-4 py-8 text-center text-gray-500 italic">${m}</td></tr>`;
+
                 document.getElementById('vuln-summary-metrics').innerHTML = `
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Filtered Vulns</p><p class="text-2xl font-bold text-gray-900">Aggregated</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Impacted Assets</p><p class="text-2xl font-bold text-gray-900">${riskMap.length}</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Patchable Assets</p><p class="text-2xl font-bold text-gray-900">${patchableRiskMap.length}</p></div>
-                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Unique CVEs</p><p class="text-2xl font-bold text-gray-900">${cveSummary.length}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Findings</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalFindings)}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Risk</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalRisk)}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Patchable Risk</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalPatchableRisk)}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Critical Findings</p><p class="text-2xl font-bold text-gray-900">${formatNum(totalCriticalFindings)}</p></div>
                 `;
+
+                const topAssets = getTop(riskMap);
+                document.getElementById('vuln-top-assets').innerHTML = topAssets.length ? topAssets.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.name}</td><td class="px-4 py-3 text-gray-600">${t.owner}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
+
+                const topPatchable = getTop(patchableRiskMap);
+                document.getElementById('vuln-top-patchable').innerHTML = topPatchable.length ? topPatchable.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.name}</td><td class="px-4 py-3 text-gray-600">${t.owner}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
+
+                const topTeams = getTop(teams);
+                document.getElementById('vuln-top-teams').innerHTML = topTeams.length ? topTeams.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.owner}</td><td class="px-4 py-3 text-gray-600">${formatNum(t.count)} Assets</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
+
+                const topSvcs = getTop(svcs);
+                document.getElementById('vuln-top-services').innerHTML = topSvcs.length ? topSvcs.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-medium text-gray-700">${t.service}</td><td class="px-4 py-3 text-gray-600">${formatNum(t.count)} Assets</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No assets currently meet filter criteria.");
+
+                const topCves = getTop(cves);
+                document.getElementById('vuln-top-cves').innerHTML = topCves.length ? topCves.map(t => `<tr class="even:bg-gray-50 hover:bg-blue-50 transition"><td class="px-4 py-3 font-mono text-xs text-blue-700 font-semibold">${t.cve}</td><td class="px-4 py-3 text-sm truncate max-w-sm text-gray-700" title="${t.title}">${t.title || 'N/A'}</td><td class="px-4 py-3 text-center">${badge(t.risk)}</td><td class="px-4 py-3 text-right font-mono font-semibold text-gray-800">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No correlated vulnerabilities available.");
             }
         }
 
