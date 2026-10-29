@@ -1085,6 +1085,12 @@
             }
 
             // The models this connector can actually use, straight from the service (no typing model names by hand).
+            // A bare host such as http://localhost:11434 means the OpenAI-compatible API at /v1
+            static apiBase(s) {
+                const b = s.baseUrl.trim().replace(/\/+$/, '');
+                return /^https?:\/\/[^\/]+$/i.test(b) ? b + '/v1' : b;
+            }
+
             static async listModels(s) {
                 const get = async (url, headers) => {
                     let res;
@@ -1105,7 +1111,7 @@
                     out = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
                         .map(m => { const id = String(m.name).replace(/^models\//, ''); return { id, label: m.displayName ? `${m.displayName} (${id})` : id }; });
                 } else {
-                    const base = s.baseUrl.replace(/\/+$/, '');
+                    const base = this.apiBase(s);
                     const headers = s.apiKey ? { Authorization: 'Bearer ' + s.apiKey } : {};
                     try {
                         const j = await get(base + '/models', headers);
@@ -1154,7 +1160,7 @@
                     text = (cand.content?.parts || []).map(p => p.text || '').join('');
                     (cand.groundingMetadata?.groundingChunks || []).forEach(c => addSource(c.web?.uri, c.web?.title));
                 } else {
-                    const url = s.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+                    const url = this.apiBase(s) + '/chat/completions';
                     const headers = { 'Content-Type': 'application/json' };
                     if (s.apiKey) headers['Authorization'] = 'Bearer ' + s.apiKey;
                     const json = await this.post(url, headers, { model, temperature: 0.2, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] });
