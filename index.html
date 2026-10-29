@@ -41,7 +41,7 @@
             <button onclick="app.switchView('register')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🗄️ Asset Register</button>
             <button onclick="app.switchView('vuln')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🛡️ Vuln Management</button>
             <button onclick="app.switchView('health')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🩺 Data Health</button>
-            <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Executive Report</button>
+            <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Team Risk Reports</button>
         </nav>
         <div class="p-4 border-t border-slate-700 print-hide">
             <button onclick="app.exportDatabase()" class="w-full bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded transition mb-2">💾 Backup DB (JSON)</button>
@@ -237,15 +237,23 @@
                  </div>
             </section>
 
-            <!-- VIEW: EXECUTIVE RISK REPORT -->
+            <!-- VIEW: TEAM RISK REPORTS -->
             <section id="view-reports" class="view-section">
                 <div class="bg-white rounded-lg shadow p-8 max-w-5xl mx-auto border" id="printable-report">
                     <div class="flex justify-between items-center mb-8 border-b pb-4">
                         <div>
-                            <h2 class="text-3xl font-bold text-slate-800">Executive Risk Report</h2>
+                            <h2 class="text-3xl font-bold text-slate-800" id="report-title">Team Risk Report</h2>
                             <p class="text-gray-500 text-sm mt-1" id="report-date-main"></p>
                         </div>
-                        <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded shadow-sm text-sm font-medium print-hide">🖨️ Print PDF</button>
+                        <div class="flex items-center space-x-4 print-hide">
+                            <select id="report-scope-selector" onchange="app.renderReports()" class="border-gray-300 rounded text-sm font-medium shadow-sm py-2">
+                                <option value="ALL">Entire Estate</option>
+                                <option value="Platform">Platform Team</option>
+                                <option value="CORP">CORP Team</option>
+                                <option value="NOPS">NOPS Team</option>
+                            </select>
+                            <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded shadow-sm text-sm font-medium">🖨️ Print PDF</button>
+                        </div>
                     </div>
 
                     <!-- 1. Executive Summary -->
@@ -256,19 +264,10 @@
                         </div>
                     </div>
 
-                    <!-- 2 & 3: Teams & Services side-by-side -->
+                    <!-- 2 & 3: Services & Assets side-by-side -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">2. Team Risk Summary</h3>
-                            <table class="min-w-full text-sm text-left">
-                                <thead class="text-gray-500 bg-gray-50 border-b">
-                                    <tr><th class="py-2 px-2 font-semibold">Team</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Combined Risk</th></tr>
-                                </thead>
-                                <tbody id="rpt-team-risk" class="divide-y"></tbody>
-                            </table>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">3. Top Risk Services</h3>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">2. Top Risk Services</h3>
                             <table class="min-w-full text-sm text-left">
                                 <thead class="text-gray-500 bg-gray-50 border-b">
                                     <tr><th class="py-2 px-2 font-semibold">Service</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Weighted Risk</th></tr>
@@ -276,12 +275,8 @@
                                 <tbody id="rpt-svc-risk" class="divide-y"></tbody>
                             </table>
                         </div>
-                    </div>
-
-                    <!-- 4 & 5: Assets & Patching -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">4. Highest Risk Assets</h3>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">3. Highest Risk Assets</h3>
                             <table class="min-w-full text-sm text-left">
                                 <thead class="text-gray-500 bg-gray-50 border-b">
                                     <tr><th class="py-2 px-2 font-semibold">Asset</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Weighted Risk</th></tr>
@@ -289,8 +284,12 @@
                                 <tbody id="rpt-top-assets" class="divide-y"></tbody>
                             </table>
                         </div>
+                    </div>
+
+                    <!-- 4 & 5: Patching & Health -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">5. Patching Priority Queue</h3>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">4. Patching Priority Queue</h3>
                             <table class="min-w-full text-sm text-left">
                                 <thead class="text-gray-500 bg-gray-50 border-b">
                                     <tr><th class="py-2 px-2 font-semibold">Asset</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Patchable Risk</th></tr>
@@ -298,29 +297,16 @@
                                 <tbody id="rpt-patch-priority" class="divide-y"></tbody>
                             </table>
                         </div>
-                    </div>
-
-                    <!-- 6: Highest Impact Vulnerabilities -->
-                    <div class="mb-8 print-break">
-                        <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">6. Highest Impact Vulnerabilities</h3>
-                        <table class="min-w-full text-sm text-left">
-                            <thead class="text-gray-500 bg-gray-50 border-b">
-                                <tr><th class="py-2 px-2 font-semibold">CVE</th><th class="py-2 px-2 font-semibold w-full">Description</th><th class="py-2 px-2 font-semibold text-center">Sev</th><th class="py-2 px-2 font-semibold text-right">Impact</th></tr>
-                            </thead>
-                            <tbody id="rpt-top-cves" class="divide-y"></tbody>
-                        </table>
-                    </div>
-
-                    <!-- 7 & 8: Gov Health & Actions -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 bg-gray-50 p-6 rounded-lg border">
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">7. Governance Health</h3>
+                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">5. Governance Health</h3>
                             <div id="rpt-gov-health" class="space-y-4"></div>
                         </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 mb-3">8. Recommended Actions This Month</h3>
-                            <ul id="rpt-actions" class="list-disc pl-5 space-y-2 text-sm text-gray-700"></ul>
-                        </div>
+                    </div>
+
+                    <!-- 6: Actions -->
+                    <div class="bg-blue-50 border border-blue-200 p-6 rounded-lg print-break">
+                        <h3 class="text-lg font-bold text-blue-900 border-b border-blue-200 pb-2 mb-4">6. Recommended Actions Next 30 Days</h3>
+                        <ul id="rpt-actions" class="list-disc pl-5 space-y-3 text-sm text-blue-800"></ul>
                     </div>
                 </div>
             </section>
@@ -1385,11 +1371,15 @@
             }
 
             renderReports() {
-                const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                const assetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
-                const cveSummary = StorageService.load(StorageService.KEYS.VULN_CVE_SUMMARY) || [];
+                const rawReg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
+                const rawAssetSummary = StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || [];
 
+                const scope = document.getElementById('report-scope-selector').value;
+                document.getElementById('report-title').textContent = scope === 'ALL' ? 'Estate Risk Report' : `${scope} Team Risk Report`;
                 document.getElementById('report-date-main').textContent = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', day: 'numeric' });
+
+                const reg = scope === 'ALL' ? rawReg : rawReg.filter(r => r.owner === scope);
+                const assetSummary = scope === 'ALL' ? rawAssetSummary : rawAssetSummary.filter(a => a.owner === scope);
 
                 const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
                 const badge = (r) => {
@@ -1401,72 +1391,69 @@
                 const empty = (c, m) => `<tr><td colspan="${c}" class="px-2 py-4 text-center text-gray-500 italic">${m}</td></tr>`;
 
                 // 1. Executive Summary Calc
-                let totalFindings = 0, totalRisk = 0, totalPatchableRisk = 0, totalCritical = 0;
-                const teamMap = {}, svcMap = {};
+                let totalFindings = 0, totalRisk = 0, totalPatchableRisk = 0;
+                const svcMap = {};
                 
                 assetSummary.forEach(a => {
                     totalFindings += a.findingsTotal;
                     totalPatchableRisk += a.riskPatchable;
-                    totalCritical += a.findingsCritical;
                     totalRisk += a.riskTotal;
 
                     if (a.riskTotal > 0) {
-                        if (!teamMap[a.owner]) teamMap[a.owner] = { owner: a.owner, risk: 0 };
-                        teamMap[a.owner].risk += a.riskTotal;
-
                         if (!svcMap[a.service]) svcMap[a.service] = { service: a.service, risk: 0 };
                         svcMap[a.service].risk += a.riskTotal;
                     }
                 });
 
                 document.getElementById('rpt-exec-summary').innerHTML = `
-                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Assets</p><p class="text-xl font-bold text-gray-900">${formatNum(reg.length)}</p></div>
-                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Vulnerabilities</p><p class="text-xl font-bold text-gray-900">${formatNum(totalFindings)}</p></div>
-                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Operational Risk</p><p class="text-xl font-bold text-gray-900">${formatNum(totalRisk)}</p></div>
+                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Scope Assets</p><p class="text-xl font-bold text-gray-900">${formatNum(reg.length)}</p></div>
+                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Scope Vulns</p><p class="text-xl font-bold text-gray-900">${formatNum(totalFindings)}</p></div>
+                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Operational Risk</p><p class="text-xl font-bold text-gray-900">${formatNum(totalRisk)}</p></div>
                     <div class="p-4 bg-blue-50 rounded border border-blue-200"><p class="text-[10px] text-blue-700 uppercase font-semibold">Patchable Risk</p><p class="text-xl font-bold text-blue-900">${formatNum(totalPatchableRisk)}</p></div>
                 `;
 
                 const getTop = (arr, limit = 5) => arr.sort((x, y) => y.risk - x.risk).slice(0, limit);
 
-                // 2. Teams
-                const topTeams = getTop(Object.values(teamMap));
-                document.getElementById('rpt-team-risk').innerHTML = topTeams.length ? topTeams.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700">${t.owner}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No team risk data.");
-
-                // 3. Services
+                // 2. Services
                 const topSvcs = getTop(Object.values(svcMap));
                 document.getElementById('rpt-svc-risk').innerHTML = topSvcs.length ? topSvcs.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700">${t.service}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No service risk data.");
 
-                // 4. Top Assets
+                // 3. Top Assets
                 const topAssets = getTop(assetSummary.map(a => ({ name: a.name, risk: a.riskTotal })).filter(a => a.risk > 0));
                 document.getElementById('rpt-top-assets').innerHTML = topAssets.length ? topAssets.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700 truncate max-w-[200px]">${t.name}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No asset risk data.");
 
-                // 5. Patch Priority
+                // 4. Patch Priority
                 const topPatch = getTop(assetSummary.map(a => ({ name: a.name, risk: a.riskPatchable })).filter(a => a.risk > 0));
                 document.getElementById('rpt-patch-priority').innerHTML = topPatch.length ? topPatch.map(t => `<tr><td class="px-2 py-2 font-medium text-gray-700 truncate max-w-[200px]">${t.name}</td><td class="px-2 py-2 text-center">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold">${formatNum(t.risk)}</td></tr>`).join('') : empty(3, "No patchable risk data.");
 
-                // 6. Top CVEs
-                const topCves = getTop(cveSummary, 5);
-                document.getElementById('rpt-top-cves').innerHTML = topCves.length ? topCves.map(t => `<tr><td class="px-2 py-2 font-mono text-xs text-blue-700 font-semibold w-32">${t.cve}</td><td class="px-2 py-2 text-gray-700 truncate max-w-[300px]" title="${t.title}">${t.title || 'N/A'}</td><td class="px-2 py-2 text-center w-24">${badge(t.risk)}</td><td class="px-2 py-2 text-right font-mono font-semibold w-32">${formatNum(t.risk)}</td></tr>`).join('') : empty(4, "No CVE data available.");
-
-                // 7. Governance Health
+                // 5. Governance Health
                 const missingOwnerCount = reg.filter(r => !r.owner || r.owner === 'Unknown').length;
                 const unclassifiedCount = reg.filter(r => !r.service || r.service === 'Unclassified').length;
-                const healthScore = reg.length === 0 ? 100 : Math.round(((reg.length - missingOwnerCount) / reg.length) * 100);
+                const healthScore = reg.length === 0 ? 100 : Math.round(((reg.length - (scope === 'ALL' ? missingOwnerCount : 0) - unclassifiedCount) / reg.length) * 100);
                 
                 document.getElementById('rpt-gov-health').innerHTML = `
-                    <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Overall Data Health</span><span class="font-bold ${healthScore > 90 ? 'text-green-600' : 'text-amber-600'}">${healthScore}%</span></div>
-                    <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Missing Ownership</span><span class="font-bold text-red-600">${missingOwnerCount} Assets</span></div>
+                    <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Scope Data Health</span><span class="font-bold ${healthScore > 90 ? 'text-green-600' : 'text-amber-600'}">${healthScore}%</span></div>
+                    ${scope === 'ALL' ? `<div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Missing Ownership</span><span class="font-bold text-red-600">${missingOwnerCount} Assets</span></div>` : ''}
                     <div class="flex justify-between items-center bg-white p-3 rounded shadow-sm border"><span class="font-medium text-gray-700">Unclassified Services</span><span class="font-bold text-amber-600">${unclassifiedCount} Assets</span></div>
                 `;
 
-                // 8. Recommended Actions
+                // 6. Recommended Actions Next 30 Days
                 const actions = [];
-                if (totalPatchableRisk > 0) actions.push(`<strong>Prioritize Patching:</strong> Address the top 5 assets in the Patching Priority Queue to instantly reduce organizational risk by <strong>${formatNum(topPatch.reduce((sum, a) => sum + a.risk, 0))}</strong>.`);
-                if (missingOwnerCount > 0) actions.push(`<strong>Resolve Ownership:</strong> Assign owners to the <strong>${missingOwnerCount}</strong> orphaned assets to ensure accountability for their ${formatNum(totalRisk / (reg.length || 1) * missingOwnerCount)} estimated risk.`);
-                if (unclassifiedCount > 0) actions.push(`<strong>Service Classification:</strong> Map the <strong>${unclassifiedCount}</strong> unclassified assets to their parent services to enable accurate application-level risk reporting.`);
-                if (topTeams.length > 0) actions.push(`<strong>Targeted Remediation:</strong> The <strong>${topTeams[0].owner}</strong> team holds the highest combined operational risk and should be prioritized for remediation support this sprint.`);
+                if (topPatch.length > 0) {
+                    const topPatchRisk = topPatch.reduce((sum, a) => sum + a.risk, 0);
+                    actions.push(`<strong>Execute Patching Sprint:</strong> Deploy updates to the ${topPatch.length} assets in the Patching Priority Queue. This specific action will eliminate <strong>${formatNum(topPatchRisk)}</strong> of preventable risk.`);
+                }
+                if (topAssets.length > 0 && topAssets[0].risk > 100000) {
+                    actions.push(`<strong>Isolate Critical Infrastructure:</strong> The asset <em>${topAssets[0].name}</em> represents an extreme risk concentration. Investigate immediately for decommissioning, patching, or network isolation.`);
+                }
+                if (scope === 'ALL' && missingOwnerCount > 0) {
+                    actions.push(`<strong>Assign Orphaned Systems:</strong> There are <strong>${missingOwnerCount}</strong> active assets with no accountable team. Triage the Review Queue to establish operational ownership.`);
+                }
+                if (unclassifiedCount > 0) {
+                    actions.push(`<strong>Map Application Services:</strong> <strong>${unclassifiedCount}</strong> assets in this scope are missing service context. Update the register to enable accurate application-level downtime and risk planning.`);
+                }
                 
-                if (actions.length === 0) actions.push("No immediate governance actions required. The infrastructure is well-maintained.");
+                if (actions.length === 0) actions.push("<strong>Operational Excellence:</strong> No critical governance actions required for this scope this month. Infrastructure is well-maintained.");
                 
                 document.getElementById('rpt-actions').innerHTML = actions.map(a => `<li>${a}</li>`).join('');
             }
