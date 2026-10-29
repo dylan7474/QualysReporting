@@ -248,8 +248,8 @@
             </section>
 
             <!-- VIEW: VULNERABILITIES -->
-            <section id="view-vuln" class="view-section space-y-6">
-                <div class="flex justify-between items-center mb-4">
+            <section id="view-vuln" class="view-section h-full flex flex-col space-y-4">
+                <div class="flex justify-between items-center">
                     <div>
                         <h3 class="text-xl font-semibold">Vulnerability Management</h3>
                         <p class="text-sm text-gray-500">Import Qualys Vulnerability CSV to prioritize by Asset exposure.</p>
@@ -259,17 +259,32 @@
                         <label for="vuln-file-input" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 shadow-sm font-medium cursor-pointer">Import Vuln CSV</label>
                     </div>
                 </div>
-                <div id="vuln-import-result" class="hidden"></div>
+                
+                <div class="bg-white p-3 rounded-lg shadow border flex flex-wrap gap-4 items-end">
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Patchability</label><select id="vuln-filter-patchable" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All</option><option value="YES">Patchable Only</option></select></div>
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Severity</label><select id="vuln-filter-severity" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Severities</option><option value="4+">Severity 4+</option><option value="5">Severity 5</option></select></div>
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Owner</label><select id="vuln-filter-owner" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Owners</option><option value="Platform">Platform Only</option><option value="CORP">CORP Only</option></select></div>
+                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Exposure</label><select id="vuln-filter-exposure" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Exposures</option><option value="Internet Facing">Internet Facing Only</option></select></div>
+                </div>
+
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center" id="vuln-summary-metrics"></div>
                 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                    <div class="bg-white rounded shadow overflow-hidden border">
-                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top 10 High-Risk Assets</h4>
-                        <table class="min-w-full text-sm text-left"><tbody id="vuln-top-assets" class="divide-y"></tbody></table>
+                <div class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 mt-2">
+                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
+                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top Assets by Weighted Risk</h4>
+                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-assets" class="divide-y"></tbody></table></div>
                     </div>
-                    <div class="bg-white rounded shadow overflow-hidden border">
-                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top 10 CVEs (Weighted Impact)</h4>
-                        <table class="min-w-full text-sm text-left"><tbody id="vuln-top-cves" class="divide-y"></tbody></table>
+                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
+                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top Patchable Assets</h4>
+                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-patchable" class="divide-y"></tbody></table></div>
+                    </div>
+                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
+                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top CVEs (Weighted Impact)</h4>
+                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-cves" class="divide-y"></tbody></table></div>
+                    </div>
+                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
+                        <h4 class="bg-gray-100 px-4 py-2 font-semibold text-gray-700 border-b">Top Services by Risk</h4>
+                        <div class="overflow-auto flex-1"><table class="min-w-full text-sm text-left"><tbody id="vuln-top-services" class="divide-y"></tbody></table></div>
                     </div>
                 </div>
             </section>
@@ -743,6 +758,7 @@
                 this.importController = new ImportController(this);
                 this.reviewState = { filters: { state: 'PENDING', owner: 'ALL', service: 'ALL', search: '' }, selectedIds: new Set(), visibleIds: [], pendingAction: null };
                 this.registerState = { editingAsset: null, deletingAsset: null };
+                this.vulnState = { filters: { patchable: 'ALL', severity: 'ALL', owner: 'ALL', exposure: 'ALL' } };
             }
 
             init() {
@@ -963,14 +979,50 @@
             promptReset() { document.getElementById('modal-reset-confirm').classList.remove('hidden'); }
             executeReset() { StorageService.clearAll(); window.location.reload(); }
 
+            updateVulnFilters() {
+                this.vulnState.filters = {
+                    patchable: document.getElementById('vuln-filter-patchable').value,
+                    severity: document.getElementById('vuln-filter-severity').value,
+                    owner: document.getElementById('vuln-filter-owner').value,
+                    exposure: document.getElementById('vuln-filter-exposure').value
+                };
+                this.renderVulnDashboard();
+            }
+
             importVulnData(event) {
                 const file = event.target.files[0];
                 if (!file) return;
                 Papa.parse(file, { header: true, skipEmptyLines: true, complete: (res) => {
-                    const vulns = res.data.map(r => ({
-                        normalizedName: AssetIdentityService.normalize(r['Asset Name'] || r['Hostname']),
-                        cve: r['CVE'] || '', truRisk: parseFloat(r['TruRisk']) || 0
-                    })).filter(v => v.normalizedName !== 'unknown-asset');
+                    const vulns = res.data.map(r => {
+                        const safeGet = (keys) => {
+                            for (let k of keys) {
+                                let found = Object.keys(r).find(key => key.toLowerCase().trim() === k.toLowerCase());
+                                if (found) return r[found];
+                            }
+                            return '';
+                        };
+                        return {
+                            assetId: safeGet(['Asset Id', 'Asset ID', 'ID']),
+                            assetName: safeGet(['Asset Name', 'Hostname']),
+                            normalizedName: AssetIdentityService.normalize(safeGet(['Asset Name', 'Hostname'])),
+                            ipv4: safeGet(['Asset IPV4', 'IPV4', 'IP Address']),
+                            ipv6: safeGet(['Asset IPV6', 'IPV6']),
+                            qid: safeGet(['QID']),
+                            title: safeGet(['Title', 'Vulnerability Title']),
+                            severity: parseInt(safeGet(['Severity'])) || 0,
+                            cve: safeGet(['CVE ID', 'CVE']),
+                            cvss3: parseFloat(safeGet(['CVSSv3.1 Base', 'CVSS3.1', 'CVSS3'])) || 0,
+                            qvsScore: parseFloat(safeGet(['QVS Score', 'QVS'])) || 0,
+                            assetCriticalScore: parseFloat(safeGet(['Asset Critical Score', 'ACS'])) || 0,
+                            truRisk: parseFloat(safeGet(['TruRisk Score', 'TruRisk'])) || 0,
+                            os: safeGet(['Operating System', 'OS']),
+                            status: safeGet(['Status']),
+                            firstDetected: safeGet(['First Detected']),
+                            lastDetected: safeGet(['Last Detected']),
+                            patchable: String(safeGet(['Vuln Patchable', 'Patchable'])).toLowerCase() === 'yes' || String(safeGet(['Vuln Patchable', 'Patchable'])) === '1',
+                            tags: safeGet(['Asset Tags', 'Tags'])
+                        };
+                    }).filter(v => v.assetId || v.assetName);
                     StorageService.save(StorageService.KEYS.VULNERABILITY_REGISTER, vulns);
                     this.renderVulnDashboard();
                 }});
@@ -979,16 +1031,74 @@
             renderVulnDashboard() {
                 const vulns = StorageService.load(StorageService.KEYS.VULNERABILITY_REGISTER);
                 const reg = StorageService.load(StorageService.KEYS.ASSET_REGISTER);
-                const map = {}; reg.forEach(r => map[r.normalizedName] = r);
-                const riskMap = {};
-                vulns.forEach(v => {
-                    const a = map[v.normalizedName]; if(!a) return;
-                    if(!riskMap[a.normalizedName]) riskMap[a.normalizedName] = { name: a.normalizedName, owner: a.owner, risk: 0 };
-                    riskMap[a.normalizedName].risk += (v.truRisk * RiskScoringEngine.getMultiplier(a.exposure));
+                
+                const regByAssetId = {};
+                const regByNormName = {};
+                reg.forEach(r => {
+                    if (r.assetId) regByAssetId[r.assetId] = r;
+                    regByNormName[r.normalizedName] = r;
                 });
-                const top = Object.values(riskMap).sort((a,b) => b.risk - a.risk).slice(0,10);
-                document.getElementById('vuln-top-assets').innerHTML = top.map(t => `<tr><td class="px-4 py-2">${t.name}</td><td class="px-4 py-2">${t.owner}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk}</td></tr>`).join('');
-                document.getElementById('vuln-summary-metrics').innerHTML = `<div class="p-4 bg-gray-50 border"><p class="text-xs">Mapped Vulns</p><p class="text-2xl">${vulns.length}</p></div>`;
+
+                const riskMap = {};
+                const patchableRiskMap = {};
+                const cveMap = {};
+                const serviceMap = {};
+                let mappedCount = 0;
+
+                const { patchable, severity, owner, exposure } = this.vulnState.filters;
+
+                vulns.forEach(v => {
+                    // Correlation priority: 1. Asset Id, 2. Normalized Name (via Asset Name)
+                    let a = v.assetId ? regByAssetId[v.assetId] : null;
+                    if (!a) a = regByNormName[v.normalizedName];
+                    if (!a) return; // Unmapped vulnerability, skipped for reporting
+
+                    // Filters
+                    if (patchable === 'YES' && !v.patchable) return;
+                    if (severity === '4+' && v.severity < 4) return;
+                    if (severity === '5' && v.severity !== 5) return;
+                    if (owner !== 'ALL' && a.owner !== owner) return;
+                    if (exposure !== 'ALL' && a.exposure !== exposure) return;
+
+                    mappedCount++;
+                    const multiplier = RiskScoringEngine.getMultiplier(a.exposure);
+                    const weightedRisk = v.truRisk * multiplier;
+
+                    // Top Assets by Risk
+                    if (!riskMap[a.normalizedName]) riskMap[a.normalizedName] = { name: a.normalizedName, owner: a.owner, risk: 0 };
+                    riskMap[a.normalizedName].risk += weightedRisk;
+
+                    // Top Patchable Assets
+                    if (v.patchable) {
+                        if (!patchableRiskMap[a.normalizedName]) patchableRiskMap[a.normalizedName] = { name: a.normalizedName, owner: a.owner, risk: 0 };
+                        patchableRiskMap[a.normalizedName].risk += weightedRisk;
+                    }
+
+                    // Top CVEs
+                    if (v.cve) {
+                        if (!cveMap[v.cve]) cveMap[v.cve] = { cve: v.cve, risk: 0, title: v.title };
+                        cveMap[v.cve].risk += weightedRisk;
+                    }
+
+                    // Top Services
+                    const svc = a.service || 'Unclassified';
+                    if (!serviceMap[svc]) serviceMap[svc] = { service: svc, risk: 0 };
+                    serviceMap[svc].risk += weightedRisk;
+                });
+
+                const getTop = (map) => Object.values(map).sort((x, y) => y.risk - x.risk).slice(0, 10);
+                
+                document.getElementById('vuln-top-assets').innerHTML = getTop(riskMap).map(t => `<tr><td class="px-4 py-2">${t.name}</td><td class="px-4 py-2">${t.owner}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
+                document.getElementById('vuln-top-patchable').innerHTML = getTop(patchableRiskMap).map(t => `<tr><td class="px-4 py-2">${t.name}</td><td class="px-4 py-2">${t.owner}</td><td class="px-4 py-2 text-orange-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
+                document.getElementById('vuln-top-cves').innerHTML = getTop(cveMap).map(t => `<tr><td class="px-4 py-2 font-mono text-xs">${t.cve}</td><td class="px-4 py-2 text-xs truncate max-w-xs" title="${t.title}">${t.title || 'N/A'}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
+                document.getElementById('vuln-top-services').innerHTML = getTop(serviceMap).map(t => `<tr><td class="px-4 py-2">${t.service}</td><td class="px-4 py-2 text-red-600 font-bold">${t.risk.toFixed(1)}</td></tr>`).join('');
+                
+                document.getElementById('vuln-summary-metrics').innerHTML = `
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Total Filtered Vulns</p><p class="text-2xl font-bold text-gray-900">${mappedCount}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Impacted Assets</p><p class="text-2xl font-bold text-gray-900">${Object.keys(riskMap).length}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Patchable Assets</p><p class="text-2xl font-bold text-gray-900">${Object.keys(patchableRiskMap).length}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-xs text-gray-500 uppercase font-semibold">Unique CVEs</p><p class="text-2xl font-bold text-gray-900">${Object.keys(cveMap).length}</p></div>
+                `;
             }
         }
 
