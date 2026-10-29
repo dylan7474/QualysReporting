@@ -40,6 +40,7 @@
             </button>
             <button onclick="app.switchView('register')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🗄️ Asset Register</button>
             <button onclick="app.switchView('vuln')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🛡️ Vuln Management</button>
+            <button onclick="app.switchView('risk-accept')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">✅ Risk Acceptances</button>
             <button onclick="app.switchView('health')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">🩺 Data Health</button>
             <button onclick="app.switchView('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-slate-800 focus:bg-slate-800 transition">📄 Team Risk Reports</button>
         </nav>
@@ -311,120 +312,31 @@
                 </div>
             </section>
 
-            <!-- VIEW: VULNERABILITIES -->
-            <section id="view-vuln" class="view-section h-full flex flex-col space-y-4">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h3 class="text-xl font-semibold">Vulnerability Management</h3>
-                        <p class="text-sm text-gray-500">Import Qualys Vulnerability CSV to prioritize by Asset exposure.</p>
-                    </div>
-                    <div>
-                        <input type="file" id="vuln-file-input" accept=".csv" class="hidden" onchange="app.importVulnData(event)">
-                        <label for="vuln-file-input" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 shadow-sm font-medium cursor-pointer">Import Vuln CSV</label>
-                    </div>
+            <!-- VIEW: RISK ACCEPTANCES -->
+            <section id="view-risk-accept" class="view-section h-full flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Risk Acceptance Register</h3>
+                    <button onclick="app.openRiskModal()" class="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 font-medium">➕ Record Acceptance</button>
                 </div>
-                
-                <div id="vuln-import-progress" class="hidden bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm">
-                    <h4 class="font-bold text-blue-800 mb-2">Importing & Aggregating Vulnerabilities...</h4>
-                    <div id="vuln-header-info" class="text-xs text-blue-700 font-mono mb-3">Scanning for header...</div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>Rows Processed: <span id="vuln-prog-rows" class="font-bold">0</span></div>
-                        <div>Assets Matched: <span id="vuln-prog-matched" class="font-bold text-emerald-600">0</span></div>
-                        <div>Assets Skipped: <span id="vuln-prog-skipped" class="font-bold text-gray-500">0</span></div>
-                        <div>Findings Aggregated: <span id="vuln-prog-agg" class="font-bold text-blue-600">0</span></div>
-                    </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" id="risk-accept-kpis">
+                     <!-- KPIs go here -->
                 </div>
-
-                <div class="bg-white p-3 rounded-lg shadow border flex flex-wrap gap-4 items-end">
-                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Patchability</label><select id="vuln-filter-patchable" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All</option><option value="YES">Patchable Only</option></select></div>
-                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Severity</label><select id="vuln-filter-severity" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Severities</option><option value="4+">Severity 4+</option><option value="5">Severity 5</option></select></div>
-                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Owner</label><select id="vuln-filter-owner" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Owners</option><option value="Platform">Platform Only</option><option value="CORP">CORP Only</option></select></div>
-                    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Exposure</label><select id="vuln-filter-exposure" onchange="app.updateVulnFilters()" class="border-gray-300 rounded text-sm"><option value="ALL">All Exposures</option><option value="Internet Facing">Internet Facing Only</option></select></div>
-                </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center" id="vuln-summary-metrics"></div>
-                
-                <div class="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6 mt-2">
-                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Highest Operational Risk Assets</h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-sm text-left whitespace-nowrap">
-                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
-                                    <tr>
-                                        <th class="px-4 py-2 font-medium">Asset</th>
-                                        <th class="px-4 py-2 font-medium">Owner</th>
-                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
-                                        <th class="px-4 py-2 font-medium text-right">Weighted Risk</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="vuln-top-assets" class="divide-y"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Patching Priority Queue</h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-sm text-left whitespace-nowrap">
-                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
-                                    <tr>
-                                        <th class="px-4 py-2 font-medium">Asset</th>
-                                        <th class="px-4 py-2 font-medium">Owner</th>
-                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
-                                        <th class="px-4 py-2 font-medium text-right">Patchable Risk</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="vuln-top-patchable" class="divide-y"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Top Teams By Risk</h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-sm text-left whitespace-nowrap">
-                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
-                                    <tr>
-                                        <th class="px-4 py-2 font-medium">Team</th>
-                                        <th class="px-4 py-2 font-medium">Asset Count</th>
-                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
-                                        <th class="px-4 py-2 font-medium text-right">Combined Risk</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="vuln-top-teams" class="divide-y"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col">
-                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Highest Operational Risk Services</h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-sm text-left whitespace-nowrap">
-                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
-                                    <tr>
-                                        <th class="px-4 py-2 font-medium">Service</th>
-                                        <th class="px-4 py-2 font-medium">Asset Count</th>
-                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
-                                        <th class="px-4 py-2 font-medium text-right">Weighted Risk</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="vuln-top-services" class="divide-y"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded shadow overflow-hidden border flex flex-col lg:col-span-2">
-                        <h4 class="bg-gray-100 px-4 py-3 font-semibold text-gray-800 border-b">Highest Impact Vulnerabilities</h4>
-                        <div class="overflow-auto flex-1">
-                            <table class="min-w-full text-sm text-left whitespace-nowrap">
-                                <thead class="bg-gray-50 text-gray-600 border-b sticky top-0 z-10">
-                                    <tr>
-                                        <th class="px-4 py-2 font-medium">CVE</th>
-                                        <th class="px-4 py-2 font-medium w-full">Title</th>
-                                        <th class="px-4 py-2 font-medium text-center">Severity</th>
-                                        <th class="px-4 py-2 font-medium text-right">Weighted Impact</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="vuln-top-cves" class="divide-y"></tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div class="bg-white rounded-lg shadow flex-1 overflow-hidden flex flex-col border border-gray-200">
+                     <div class="overflow-auto flex-1">
+                         <table class="min-w-full text-left text-sm whitespace-nowrap">
+                             <thead class="bg-gray-100 text-gray-600 border-b sticky top-0 z-10">
+                                 <tr>
+                                     <th class="px-6 py-3">Asset</th>
+                                     <th class="px-6 py-3">Owner</th>
+                                     <th class="px-6 py-3">Status</th>
+                                     <th class="px-6 py-3 text-right">Accepted Risk</th>
+                                     <th class="px-6 py-3 text-center">Expiry</th>
+                                     <th class="px-6 py-3 text-right">Actions</th>
+                                 </tr>
+                             </thead>
+                             <tbody id="risk-accept-tbody" class="divide-y"></tbody>
+                         </table>
+                     </div>
                 </div>
             </section>
         </div>
@@ -496,6 +408,30 @@
                 </div>
             </div>
         </div>
+
+        <div id="modal-risk-accept" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden p-6 space-y-4 text-sm">
+                <h3 class="text-lg font-bold" id="ra-modal-title">Record Risk Acceptance</h3>
+                <form id="ra-form" onsubmit="event.preventDefault(); app.saveRiskAcceptance();" class="grid grid-cols-2 gap-4">
+                    <input type="hidden" id="ra-id">
+                    <div><label class="block font-medium mb-1">Asset</label><input type="text" id="ra-asset" required class="w-full border rounded p-2"></div>
+                    <div><label class="block font-medium mb-1">Owner</label><select id="ra-owner" class="w-full border rounded p-2"><option>Platform</option><option>CORP</option><option>NOPS</option><option>Unknown</option></select></div>
+                    <div><label class="block font-medium mb-1">Service</label><input type="text" id="ra-service" required class="w-full border rounded p-2"></div>
+                    <div><label class="block font-medium mb-1">Accepted Risk (Score)</label><input type="number" step="0.1" id="ra-risk" required class="w-full border rounded p-2"></div>
+                    <div class="col-span-2"><label class="block font-medium mb-1">Reason for Acceptance</label><textarea id="ra-reason" required class="w-full border rounded p-2"></textarea></div>
+                    <div class="col-span-2"><label class="block font-medium mb-1">Compensating Control</label><textarea id="ra-control" required class="w-full border rounded p-2"></textarea></div>
+                    <div><label class="block font-medium mb-1">Approver</label><input type="text" id="ra-approver" required class="w-full border rounded p-2"></div>
+                    <div><label class="block font-medium mb-1">Status</label><select id="ra-status" class="w-full border rounded p-2"><option>Open</option><option>Risk Accepted</option><option>Resolved</option><option>Awaiting Patch</option></select></div>
+                    <div><label class="block font-medium mb-1">Acceptance Date</label><input type="date" id="ra-acc-date" required class="w-full border rounded p-2"></div>
+                    <div><label class="block font-medium mb-1">Review Date</label><input type="date" id="ra-rev-date" required class="w-full border rounded p-2"></div>
+                    <div><label class="block font-medium mb-1">Expiry Date</label><input type="date" id="ra-exp-date" required class="w-full border rounded p-2"></div>
+                    <div class="col-span-2 flex justify-end space-x-3 mt-4 pt-4 border-t">
+                        <button type="button" onclick="app.closeModals()" class="px-4 py-2 border rounded">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save Record</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </main>
 
     <script>
@@ -511,7 +447,8 @@
                 PLATFORM_INVENTORY: 'gov_platform_inventory',
                 VULN_ASSET_SUMMARY: 'gov_vuln_asset_summary',
                 VULN_SERVICE_SUMMARY: 'gov_vuln_service_summary',
-                VULN_CVE_SUMMARY: 'gov_vuln_cve_summary'
+                VULN_CVE_SUMMARY: 'gov_vuln_cve_summary',
+                RISK_ACCEPTANCES: 'gov_risk_acceptances'
             };
 
             static load(key) {
@@ -532,8 +469,9 @@
                     vulnAssetSummary: this.load(this.KEYS.VULN_ASSET_SUMMARY),
                     vulnServiceSummary: this.load(this.KEYS.VULN_SERVICE_SUMMARY),
                     vulnCveSummary: this.load(this.KEYS.VULN_CVE_SUMMARY),
+                    riskAcceptances: this.load(this.KEYS.RISK_ACCEPTANCES),
                     exportDate: new Date().toISOString(),
-                    version: '2.4'
+                    version: '2.5'
                 };
                 const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -919,6 +857,7 @@
                 if (viewId === 'health') this.renderHealth();
                 if (viewId === 'reports') this.renderReports();
                 if (viewId === 'vuln') this.renderVulnDashboard();
+                if (viewId === 'risk-accept') this.renderRiskAcceptances();
             }
 
             updateGlobalBadges() {
@@ -936,6 +875,23 @@
                 document.getElementById('kpi-pending-review').textContent = queue.length;
                 const missing = register.filter(r => !r.owner || r.owner === 'Unknown').length;
                 document.getElementById('kpi-health-score').textContent = missing === 0 ? '100%' : Math.round(((register.length - missing) / register.length) * 100) + '%';
+                
+                const acceptances = StorageService.load(StorageService.KEYS.RISK_ACCEPTANCES) || [];
+                const now = new Date();
+                let expiring = 0, overdue = 0;
+                acceptances.forEach(a => {
+                    if (a.status === 'Risk Accepted' || a.status === 'Open') {
+                        const diff = new Date(a.expDate) - now;
+                        if (diff < 0) overdue++;
+                        else if (diff <= 30*24*60*60*1000) expiring++;
+                    }
+                });
+
+                const actionsEl = document.getElementById('dashboard-actions');
+                actionsEl.innerHTML = '';
+                if (overdue > 0) actionsEl.innerHTML += `<li><strong class="text-red-600">Risk Exposure:</strong> ${overdue} risk acceptances are overdue and require immediate review.</li>`;
+                if (expiring > 0) actionsEl.innerHTML += `<li><strong class="text-amber-600">Compliance Renewal:</strong> ${expiring} risk acceptances are expiring within 30 days.</li>`;
+                if (actionsEl.innerHTML === '') actionsEl.innerHTML = '<li>No urgent actions recommended at this time.</li>';
             }
 
             rebuildQueue() {
@@ -1405,11 +1361,20 @@
                     }
                 });
 
+                const acceptances = StorageService.load(StorageService.KEYS.RISK_ACCEPTANCES) || [];
+                let acceptedRisk = 0;
+                acceptances.filter(a => a.status === 'Risk Accepted' || a.status === 'Open').forEach(a => {
+                    if (scope === 'ALL' || a.owner === scope) {
+                        acceptedRisk += (parseFloat(a.risk) || 0);
+                    }
+                });
+                const actionableRisk = Math.max(0, totalRisk - acceptedRisk);
+
                 document.getElementById('rpt-exec-summary').innerHTML = `
-                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Scope Assets</p><p class="text-xl font-bold text-gray-900">${formatNum(reg.length)}</p></div>
-                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Scope Vulns</p><p class="text-xl font-bold text-gray-900">${formatNum(totalFindings)}</p></div>
-                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Operational Risk</p><p class="text-xl font-bold text-gray-900">${formatNum(totalRisk)}</p></div>
-                    <div class="p-4 bg-blue-50 rounded border border-blue-200"><p class="text-[10px] text-blue-700 uppercase font-semibold">Patchable Risk</p><p class="text-xl font-bold text-blue-900">${formatNum(totalPatchableRisk)}</p></div>
+                    <div class="p-4 bg-slate-50 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Risk</p><p class="text-xl font-bold text-gray-900">${formatNum(totalRisk)}</p></div>
+                    <div class="p-4 bg-amber-50 rounded border border-amber-200"><p class="text-[10px] text-amber-700 uppercase font-semibold">Accepted Risk</p><p class="text-xl font-bold text-amber-900">${formatNum(acceptedRisk)}</p></div>
+                    <div class="p-4 bg-blue-50 rounded border border-blue-200"><p class="text-[10px] text-blue-700 uppercase font-semibold">Actionable Risk</p><p class="text-xl font-bold text-blue-900">${formatNum(actionableRisk)}</p></div>
+                    <div class="p-4 bg-red-50 rounded border border-red-200"><p class="text-[10px] text-red-700 uppercase font-semibold">Patchable Risk</p><p class="text-xl font-bold text-red-900">${formatNum(totalPatchableRisk)}</p></div>
                 `;
 
                 const getTop = (arr, limit = 5) => arr.sort((x, y) => y.risk - x.risk).slice(0, limit);
@@ -1456,6 +1421,131 @@
                 if (actions.length === 0) actions.push("<strong>Operational Excellence:</strong> No critical governance actions required for this scope this month. Infrastructure is well-maintained.");
                 
                 document.getElementById('rpt-actions').innerHTML = actions.map(a => `<li>${a}</li>`).join('');
+            }
+
+            renderRiskAcceptances() {
+                const acceptances = StorageService.load(StorageService.KEYS.RISK_ACCEPTANCES) || [];
+                const formatNum = (n) => Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+                
+                let acceptedRisk = 0;
+                let acceptedAssets = new Set();
+                let expiringCount = 0;
+                let overdueCount = 0;
+                const now = new Date();
+                const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+                acceptances.forEach(a => {
+                    if (a.status === 'Risk Accepted' || a.status === 'Open') {
+                         acceptedRisk += (parseFloat(a.risk) || 0);
+                         acceptedAssets.add(a.asset);
+                         const expiry = new Date(a.expDate);
+                         const diff = expiry - now;
+                         if (diff < 0) overdueCount++;
+                         else if (diff <= thirtyDaysMs) expiringCount++;
+                    }
+                });
+                
+                document.getElementById('risk-accept-kpis').innerHTML = `
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Accepted Risk</p><p class="text-2xl font-bold text-amber-600">${formatNum(acceptedRisk)}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Accepted Assets</p><p class="text-2xl font-bold text-gray-900">${acceptedAssets.size}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Expiring (30d)</p><p class="text-2xl font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-gray-900'}">${expiringCount}</p></div>
+                    <div class="p-4 bg-white rounded border shadow-sm"><p class="text-[10px] text-gray-500 uppercase font-semibold">Overdue</p><p class="text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-gray-900'}">${overdueCount}</p></div>
+                `;
+
+                const tbody = document.getElementById('risk-accept-tbody');
+                if(acceptances.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500">No risk acceptances recorded.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = acceptances.map(a => {
+                    const expiryDiff = new Date(a.expDate) - now;
+                    let expStyle = "text-gray-600";
+                    if (a.status === 'Risk Accepted' || a.status === 'Open') {
+                        if (expiryDiff < 0) expStyle = "text-red-600 font-bold";
+                        else if (expiryDiff <= thirtyDaysMs) expStyle = "text-amber-600 font-bold";
+                    }
+
+                    return `<tr class="hover:bg-gray-50">
+                        <td class="px-6 py-3">
+                            <div class="font-medium text-gray-800">${a.asset}</div>
+                            <div class="text-[10px] text-gray-500 uppercase">${a.service}</div>
+                        </td>
+                        <td class="px-6 py-3 text-gray-600">${a.owner}</td>
+                        <td class="px-6 py-3"><span class="bg-gray-100 text-xs px-2 py-1 rounded">${a.status}</span></td>
+                        <td class="px-6 py-3 text-right font-mono font-semibold">${formatNum(a.risk)}</td>
+                        <td class="px-6 py-3 text-center ${expStyle}">${a.expDate}</td>
+                        <td class="px-6 py-3 text-right">
+                            <button onclick="app.openRiskModal('${a.id}')" class="text-blue-600 px-2 text-sm hover:underline">Edit</button>
+                            <button onclick="app.deleteRiskAcceptance('${a.id}')" class="text-red-600 px-2 text-sm hover:underline">Del</button>
+                        </td>
+                    </tr>`;
+                }).join('');
+            }
+
+            openRiskModal(id = null) {
+                const acceptances = StorageService.load(StorageService.KEYS.RISK_ACCEPTANCES) || [];
+                const form = document.getElementById('ra-form');
+                form.reset();
+                if (id) {
+                    document.getElementById('ra-modal-title').textContent = 'Edit Risk Acceptance';
+                    const a = acceptances.find(x => x.id === id);
+                    if (a) {
+                        document.getElementById('ra-id').value = a.id;
+                        document.getElementById('ra-asset').value = a.asset;
+                        document.getElementById('ra-owner').value = a.owner;
+                        document.getElementById('ra-service').value = a.service;
+                        document.getElementById('ra-risk').value = a.risk;
+                        document.getElementById('ra-reason').value = a.reason;
+                        document.getElementById('ra-control').value = a.control;
+                        document.getElementById('ra-approver').value = a.approver;
+                        document.getElementById('ra-status').value = a.status;
+                        document.getElementById('ra-acc-date').value = a.accDate;
+                        document.getElementById('ra-rev-date').value = a.revDate;
+                        document.getElementById('ra-exp-date').value = a.expDate;
+                    }
+                } else {
+                    document.getElementById('ra-modal-title').textContent = 'Record Risk Acceptance';
+                    document.getElementById('ra-id').value = '';
+                    const today = new Date().toISOString().split('T')[0];
+                    document.getElementById('ra-acc-date').value = today;
+                }
+                document.getElementById('modal-risk-accept').classList.remove('hidden');
+            }
+
+            saveRiskAcceptance() {
+                const acceptances = StorageService.load(StorageService.KEYS.RISK_ACCEPTANCES) || [];
+                const id = document.getElementById('ra-id').value || 'RA-' + Date.now();
+                const record = {
+                    id,
+                    asset: document.getElementById('ra-asset').value,
+                    owner: document.getElementById('ra-owner').value,
+                    service: document.getElementById('ra-service').value,
+                    risk: parseFloat(document.getElementById('ra-risk').value) || 0,
+                    reason: document.getElementById('ra-reason').value,
+                    control: document.getElementById('ra-control').value,
+                    approver: document.getElementById('ra-approver').value,
+                    status: document.getElementById('ra-status').value,
+                    accDate: document.getElementById('ra-acc-date').value,
+                    revDate: document.getElementById('ra-rev-date').value,
+                    expDate: document.getElementById('ra-exp-date').value
+                };
+                
+                const idx = acceptances.findIndex(x => x.id === id);
+                if (idx > -1) acceptances[idx] = record;
+                else acceptances.push(record);
+                
+                StorageService.save(StorageService.KEYS.RISK_ACCEPTANCES, acceptances);
+                this.closeModals();
+                this.renderRiskAcceptances();
+            }
+
+            deleteRiskAcceptance(id) {
+                if (!confirm('Are you sure you want to delete this risk acceptance?')) return;
+                let acceptances = StorageService.load(StorageService.KEYS.RISK_ACCEPTANCES) || [];
+                acceptances = acceptances.filter(x => x.id !== id);
+                StorageService.save(StorageService.KEYS.RISK_ACCEPTANCES, acceptances);
+                this.renderRiskAcceptances();
             }
         }
 
