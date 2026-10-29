@@ -536,16 +536,19 @@
                 <div class="flex justify-between items-start mb-4">
                     <div>
                         <h3 class="text-2xl font-bold text-gray-800" id="det-name">Asset Name</h3>
-                        <p class="text-sm text-gray-500" id="det-env">Environment • Service • Exposure</p>
+                        <p class="text-sm text-gray-500 mb-1" id="det-env">Environment • Service • Exposure</p>
+                        <p class="text-xs font-semibold text-gray-700">Owner: <span id="det-owner" class="text-blue-600 font-bold"></span> <span class="mx-2 text-gray-300">|</span> Status: <span id="det-status" class="uppercase font-bold"></span></p>
                     </div>
                     <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-800 text-2xl font-bold">&times;</button>
                 </div>
                 
-                <div class="grid grid-cols-4 gap-4 mb-4">
-                    <div class="bg-gray-50 p-3 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Owner</p><p class="font-bold text-gray-800" id="det-owner"></p></div>
-                    <div class="bg-gray-50 p-3 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Risk Status</p><p class="font-bold text-gray-800" id="det-status"></p></div>
-                    <div class="bg-blue-50 border border-blue-200 p-3 rounded"><p class="text-[10px] text-blue-600 uppercase font-semibold">Actionable Risk</p><p class="font-bold text-blue-800 text-lg" id="det-actionable"></p></div>
-                    <div class="bg-amber-50 border border-amber-200 p-3 rounded"><p class="text-[10px] text-amber-600 uppercase font-semibold">Accepted Risk</p><p class="font-bold text-amber-800 text-lg" id="det-accepted"></p></div>
+                <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+                    <div class="bg-gray-50 p-2 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Findings</p><p class="font-bold text-gray-800 text-lg" id="det-total-find"></p></div>
+                    <div class="bg-red-50 border border-red-100 p-2 rounded"><p class="text-[10px] text-red-600 uppercase font-semibold">Critical Findings</p><p class="font-bold text-red-700 text-lg" id="det-crit-find"></p></div>
+                    <div class="bg-blue-50 border border-blue-100 p-2 rounded"><p class="text-[10px] text-blue-600 uppercase font-semibold">Patchable Findings</p><p class="font-bold text-blue-700 text-lg" id="det-patch-find"></p></div>
+                    <div class="bg-gray-50 p-2 rounded border"><p class="text-[10px] text-gray-500 uppercase font-semibold">Total Risk</p><p class="font-bold text-gray-800 text-lg" id="det-total-risk"></p></div>
+                    <div class="bg-emerald-50 border border-emerald-200 p-2 rounded"><p class="text-[10px] text-emerald-600 uppercase font-semibold">Patchable Risk</p><p class="font-bold text-emerald-800 text-lg" id="det-patch-risk"></p></div>
+                    <div class="bg-amber-50 border border-amber-200 p-2 rounded"><p class="text-[10px] text-amber-600 uppercase font-semibold">Actionable Risk</p><p class="font-bold text-amber-800 text-lg" id="det-actionable"></p></div>
                 </div>
 
                 <div class="flex-1 overflow-hidden flex flex-col border rounded mb-4 min-h-[250px]">
@@ -1353,7 +1356,6 @@
                 const assetSummary = {};
                 const serviceSummary = {};
                 const cveSummary = {};
-                const vulnDetails = {};
 
                 let headerFound = false;
                 let headerRow = [];
@@ -1423,19 +1425,6 @@
                         const multiplier = RiskScoringEngine.getMultiplier(a.exposure);
                         const weightedRisk = truRisk * multiplier;
 
-                        // Detailed Findings Bucket
-                        if (!vulnDetails[a.normalizedName]) vulnDetails[a.normalizedName] = [];
-                        const ageStr = (safeGet(['First Detected', 'Age']) || 'N/A').split('T')[0];
-                        vulnDetails[a.normalizedName].push([
-                            safeGet(['QID']) || '',
-                            cve,
-                            severity,
-                            title.substring(0, 100), // Trim for space
-                            patchable ? 1 : 0,
-                            ageStr,
-                            truRisk
-                        ]);
-
                         // Asset Summary Bucket
                         if (!assetSummary[a.normalizedName]) {
                             assetSummary[a.normalizedName] = {
@@ -1451,7 +1440,8 @@
                                 riskTotal: 0,
                                 riskPatchable: 0,
                                 riskSev4Plus: 0,
-                                riskSev5: 0
+                                riskSev5: 0,
+                                topFindings: []
                             };
                         }
                         
@@ -1464,6 +1454,17 @@
                         if (patchable) as.riskPatchable += weightedRisk;
                         if (severity >= 4) as.riskSev4Plus += weightedRisk;
                         if (severity === 5) as.riskSev5 += weightedRisk;
+
+                        const ageStr = (safeGet(['First Detected', 'Age']) || 'N/A').split('T')[0];
+                        as.topFindings.push([
+                            safeGet(['QID']) || '',
+                            cve,
+                            severity,
+                            title.substring(0, 100), // Trim for space
+                            patchable ? 1 : 0,
+                            ageStr,
+                            truRisk
+                        ]);
 
                         // Service Summary Bucket
                         const svc = as.service;
@@ -1488,18 +1489,16 @@
                         document.getElementById('vuln-prog-skipped').textContent = uniqueAssetsSkipped.size;
                         document.getElementById('vuln-prog-agg').textContent = findingsAggregated;
 
-                        // OPTIMIZATION: Prevent QuotaExceededError in localStorage
-                        // Cap the stored detailed findings to the top 50 highest risk per asset.
-                        Object.keys(vulnDetails).forEach(assetName => {
-                            vulnDetails[assetName] = vulnDetails[assetName]
+                        // OPTIMIZATION: Cap the stored detailed findings to the top 25 highest risk per asset.
+                        Object.values(assetSummary).forEach(as => {
+                            as.topFindings = as.topFindings
                                 .sort((a, b) => b[6] - a[6]) // Sort by TruRisk descending
-                                .slice(0, 50); // Keep only the top 50 actionable findings
+                                .slice(0, 25); // Limit to top 25
                         });
 
                         StorageService.save(StorageService.KEYS.VULN_ASSET_SUMMARY, Object.values(assetSummary));
                         StorageService.save(StorageService.KEYS.VULN_SERVICE_SUMMARY, Object.values(serviceSummary));
                         StorageService.save(StorageService.KEYS.VULN_CVE_SUMMARY, Object.values(cveSummary));
-                        StorageService.save(StorageService.KEYS.VULN_DETAILS, vulnDetails);
                         
                         this.renderVulnDashboard();
                         
@@ -1795,27 +1794,45 @@
                 if (!reg) return;
                 
                 const vulnSum = (StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).find(v => v.name === assetName);
-                const vulns = (StorageService.load(StorageService.KEYS.VULN_DETAILS) || {})[assetName] || [];
+                const vulns = vulnSum ? (vulnSum.topFindings || []) : [];
 
                 this.raState.currentDetailAsset = assetName;
 
                 document.getElementById('det-name').textContent = assetName;
                 document.getElementById('det-env').textContent = `${reg.environment || 'Prod'} • ${reg.service || 'Unclassified'} • ${reg.exposure || 'Unknown Exposure'}`;
-                document.getElementById('det-owner').textContent = reg.owner || 'Unknown';
-                document.getElementById('det-status').textContent = reg.riskStatus || 'Open';
+                
+                const detOwnerEl = document.getElementById('det-owner');
+                if (detOwnerEl) detOwnerEl.textContent = reg.owner || 'Unknown';
+                
+                const detStatusEl = document.getElementById('det-status');
+                if (detStatusEl) detStatusEl.textContent = reg.riskStatus || 'Open';
 
                 const formatNum = (n) => Math.round(n).toLocaleString();
-                let actionable = 0, accepted = 0;
+                
+                let actionable = 0, totalRisk = 0, patchableRisk = 0;
+                let totalFind = 0, critFind = 0, patchFind = 0;
+
                 if (vulnSum) {
-                    if ((reg.riskStatus || 'Open') === 'Risk Accepted') accepted = vulnSum.riskTotal;
-                    else actionable = vulnSum.riskTotal;
+                    totalRisk = vulnSum.riskTotal;
+                    patchableRisk = vulnSum.riskPatchable;
+                    totalFind = vulnSum.findingsTotal;
+                    critFind = vulnSum.findingsCritical;
+                    patchFind = vulnSum.findingsPatchable;
+
+                    if ((reg.riskStatus || 'Open') !== 'Risk Accepted') actionable = vulnSum.riskTotal;
                 }
-                document.getElementById('det-actionable').textContent = formatNum(actionable);
-                document.getElementById('det-accepted').textContent = formatNum(accepted);
+
+                const el = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
+                el('det-total-find', formatNum(totalFind));
+                el('det-crit-find', formatNum(critFind));
+                el('det-patch-find', formatNum(patchFind));
+                el('det-total-risk', formatNum(totalRisk));
+                el('det-actionable', formatNum(actionable));
+                el('det-patch-risk', formatNum(patchableRisk));
 
                 const tbody = document.getElementById('det-vulns-tbody');
                 if (vulns.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-6 text-center text-gray-500 italic">No vulnerability findings discovered for this asset.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-6 text-center text-gray-500 italic">No detailed findings retained for this asset.</td></tr>';
                 } else {
                     const badge = (s) => s === 5 ? `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] font-bold">5</span>` : (s === 4 ? `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold">4</span>` : `<span class="bg-gray-100 text-gray-800 px-2 py-0.5 rounded text-[10px] font-bold">${s}</span>`);
                     tbody.innerHTML = vulns.sort((a,b) => b[6] - a[6]).map(v => `
@@ -1826,7 +1843,7 @@
                             <td class="px-3 py-2 text-xs text-gray-800 truncate max-w-sm" title="${v[3]}">${v[3]}</td>
                             <td class="px-3 py-2 text-center text-xs">${v[4] ? '✅' : '-'}</td>
                             <td class="px-3 py-2 text-xs text-gray-500">${v[5]}</td>
-                            <td class="px-3 py-2 text-right text-xs font-mono font-bold">${v[6]}</td>
+                            <td class="px-3 py-2 text-right text-xs font-mono font-bold">${Math.round(v[6])}</td>
                         </tr>
                     `).join('');
                 }
@@ -1837,7 +1854,8 @@
 
             generateRemediationAdvice() {
                 const assetName = this.raState.currentDetailAsset;
-                const vulns = (StorageService.load(StorageService.KEYS.VULN_DETAILS) || {})[assetName] || [];
+                const vulnSum = (StorageService.load(StorageService.KEYS.VULN_ASSET_SUMMARY) || []).find(v => v.name === assetName);
+                const vulns = vulnSum ? (vulnSum.topFindings || []) : [];
                 const out = document.getElementById('det-advice-content');
                 
                 if (vulns.length === 0) {
