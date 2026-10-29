@@ -2856,7 +2856,7 @@
             static AI_SYSTEM = `You are a senior infrastructure security engineer advising a platform operations team on remediating vulnerabilities reported by Qualys.
 Use ONLY the data supplied. Never invent CVE numbers, patch versions, KB numbers or advisories; if the vendor solution is missing or unclear, say so.
 Be practical and specific to the operating systems and service roles shown (take extra care with domain controllers, databases and backup servers: snapshot first, stagger the rollout, use a maintenance window).
-Prefer fixes that clear many detections at once. When a "Public intelligence" block is supplied (NVD, CISA KEV, EPSS, Red Hat, OSV), use it and name the CVE it comes from; if web search results are available, cite the source. Never state a fixed version that is not in the supplied data or search results. Priority labels: "Fix now" = known exploited (CISA KEV, active attacks, ransomware, wormable, zero-day); "This sprint" = high QVS or remote code execution with a public exploit.
+Prefer fixes that clear many detections at once. A line starting FAMILY folds several advisories for one product into one row: treat it as one rollout (install the newest build, then rescan to confirm the older advisories closed) rather than many separate jobs, and do not claim the older ones are covered unless the vendor solution or supplied data says so. When a "Public intelligence" block is supplied (NVD, CISA KEV, EPSS, Red Hat, OSV), use it and name the CVE it comes from; if web search results are available, cite the source. Never state a fixed version that is not in the supplied data or search results. Priority labels: "Fix now" = known exploited (CISA KEV, active attacks, ransomware, wormable, zero-day); "This sprint" = high QVS or remote code execution with a public exploit.
 Write in British English. Use Markdown headings, short bullet lists and numbered steps. Do not use tables. Keep it under about 450 words.
 Finish with a "Verify" section saying how to confirm in Qualys (agent check-in or rescan) that the detections have closed.`;
 
@@ -2868,8 +2868,12 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                     const q = vd.qmap.get(id) || {};
                     (q.cves || []).slice(0, n).forEach(c => items.push({ cve: c.id, q }));
                 } else {
-                    const groups = kind === 'asset' ? PriorityEngine.fixGroups(vd.byAsset.get(id) || [], vd.qmap) : (this.reportCtx?.groups || []);
-                    groups.slice(0, n).forEach(g => { const q = vd.qmap.get(g.qid) || {}; if (q.cves && q.cves[0]) items.push({ cve: q.cves[0].id, q }); });
+                    const plain = kind === 'asset' ? PriorityEngine.fixGroups(vd.byAsset.get(id) || [], vd.qmap) : (this.reportCtx?.groups || []);
+                    PriorityEngine.familyGroups(plain, vd.qmap).slice(0, n).forEach(g => {
+                        const qid = g.family ? (g.newest ? g.newest.qid : g.members[0].qid) : g.qid; // a family is represented by its newest update
+                        const q = vd.qmap.get(qid) || {};
+                        if (q.cves && q.cves[0]) items.push({ cve: q.cves[0].id, q });
+                    });
                     if (kind === 'asset') os = (StorageService.load(StorageService.KEYS.ASSET_REGISTER).find(r => r.normalizedName === id) || {}).os || '';
                 }
                 return { items, os };
@@ -2936,15 +2940,30 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                     const r = reg.get(name) || {}, x = sums.get(name) || {};
                     return `${anon.alias(name)} | OS: ${short(r.os, 70) || 'unknown'} | service: ${r.service || 'Unclassified'} | owner: ${r.owner || 'Unknown'} | criticality ${x.criticality || '?'}/5 | TruRisk ${x.truRisk || '?'}`;
                 };
+                const adv = (t) => (String(t).match(/\(([^()]*\d[^()]*)\)\s*$/) || [])[1] || ''; // advisory id in the trailing parentheses
                 const groupLine = (g, L) => {
-                    const q = vd.qmap.get(g.qid) || {};
+                    const rep = g.family ? (g.members.find(m => g.newest && m.qid === g.newest.qid) || g.members[0]) : g;
+                    const q = vd.qmap.get(rep.qid) || {};
                     const cves = (q.cves || []).slice(0, L.cves).map(c => c.id).join(', ');
-                    const sol = L.sol ? ` | vendor solution: ${short(q.solution, L.sol) || 'none'}` : '';
-                    return `- [${PriorityEngine.LABELS[g.tier]}] QID ${g.qid} | ${short(q.title, 110)} | CVEs: ${cves || 'none'}${(q.cveCount || 0) > L.cves ? ` (+${q.cveCount - L.cves})` : ''} | QVS ${g.qvs || '?'} | flags: ${flags(q)} | patchable: ${g.patchable ? 'yes' : 'no'} | assets: ${g.assets.size} | oldest ${g.maxAge}d${sol}`;
+                    const sol = L.sol ? ` | vendor solution${g.family ? ' (newest update)' : ''}: ${short(q.solution, g.family ? Math.max(60, Math.floor(L.sol / 2)) : L.sol) || 'none'}` : ''; // a family's solutions read alike, so keep less of it
+                    const more = (q.cveCount || 0) > L.cves ? ` (+${q.cveCount - L.cves})` : '';
+                    if (g.family) {
+                        const rti = [...new Set(g.members.flatMap(m => (vd.qmap.get(m.qid) || {}).rti || []))];
+                        const patch = g.members.filter(m => m.patchable).length;
+                        return `- [${PriorityEngine.LABELS[g.tier]}] FAMILY "${short(g.title, 90)}" | ${g.members.length} updates folded together${g.newest ? ` | newest: ${adv(g.newest.title) || 'QID ' + g.newest.qid}${g.newest.date ? ' released ' + g.newest.date : ''}` : ''} | CVEs (newest update): ${cves || 'none'}${more} | QVS up to ${g.qvs || '?'} | flags: ${flags({ rti })} | patchable: ${patch} of ${g.members.length} | assets: ${g.assets.size} | oldest ${g.maxAge}d${sol}`;
+                    }
+                    return `- [${PriorityEngine.LABELS[g.tier]}] QID ${g.qid} | ${short(q.title, 110)} | CVEs: ${cves || 'none'}${more} | QVS ${g.qvs || '?'} | flags: ${flags(q)} | patchable: ${g.patchable ? 'yes' : 'no'} | assets: ${g.assets.size} | oldest ${g.maxAge}d${sol}`;
                 };
 
                 // Public intelligence for the CVEs that matter most here (CVE ids only leave the browser).
-                const groupsFor = kind === 'asset' ? PriorityEngine.fixGroups(vd.byAsset.get(id) || [], vd.qmap) : (kind === 'report' ? (this.reportCtx?.groups || []) : []);
+                const plainFor = kind === 'asset' ? PriorityEngine.fixGroups(vd.byAsset.get(id) || [], vd.qmap) : (kind === 'report' ? (this.reportCtx?.groups || []) : []);
+                const groupsFor = PriorityEngine.familyGroups(plainFor, vd.qmap);
+                // for a single vulnerability: tell the model about its siblings
+                let famNote = '';
+                if (kind === 'qid') {
+                    const fam = PriorityEngine.familyGroups(PriorityEngine.fixGroups(vd.dets, vd.qmap), vd.qmap).find(x => x.family && x.members.some(m => m.qid === id));
+                    if (fam) famNote = `Family context: this is one of ${fam.members.length} similar updates for "${short(fam.title, 90)}" across ${fam.assets.size} assets in total${fam.newest ? `; the newest is ${adv(fam.newest.title) || 'QID ' + fam.newest.qid}${fam.newest.date ? ' (released ' + fam.newest.date + ')' : ''}` : ''}.\n`;
+                }
                 const { items, os } = this.pickResearch(vd, kind, id, kind === 'report' ? 5 : 4);
                 const research = s.webResearch && items.length
                     ? await WebResearch.lookup(items.map(i => i.cve), items.filter(i => i.q.category === 'RedHat').map(i => i.cve), os)
@@ -2958,17 +2977,17 @@ Finish with a "Verify" section saying how to confirm in Qualys (agent check-in o
                     if (kind === 'asset') {
                         const list = vd.byAsset.get(id) || [];
                         const groups = groupsFor;
-                        return `Asset (one host):\n${assetLine(id)}\n${caveat}\nThe host has ${list.length} detections in ${groups.length} distinct fixes. The ${Math.min(L.groups, groups.length)} highest-priority fixes:\n${groups.slice(0, L.groups).map(g => groupLine(g, L)).join('\n')}\n${intel}\nTask: give a remediation plan for this host. Cover the fix order and why, what to do for the operating system shown, change risk for its service role, what cannot be patched and the compensating control, and how to verify.`;
+                        return `Asset (one host):\n${assetLine(id)}\n${caveat}\nThe host has ${list.length} detections in ${plainFor.length} distinct fixes (${groups.length} rows after folding repeated updates for the same product). The ${Math.min(L.groups, groups.length)} highest-priority rows:\n${groups.slice(0, L.groups).map(g => groupLine(g, L)).join('\n')}\n${intel}\nTask: give a remediation plan for this host. Cover the fix order and why, what to do for the operating system shown, change risk for its service role, what cannot be patched and the compensating control, and how to verify.`;
                     }
                     if (kind === 'qid') {
                         const q = vd.qmap.get(id) || {};
                         const list = vd.byQid.get(id) || [];
                         const assets = [...new Set(list.map(d => d.asset))].sort((a, b) => (sums.get(b)?.criticality || 0) - (sums.get(a)?.criticality || 0));
-                        return `Vulnerability: QID ${id} | ${short(q.title, 160)}\nCVEs: ${(q.cves || []).slice(0, L.cves + 4).map(c => `${c.id} (CVSS ${c.cvss || '?'})`).join(', ') || 'none'}${(q.cveCount || 0) > L.cves + 4 ? ` (+${q.cveCount - L.cves - 4} more)` : ''}\nQualys real-time intelligence: ${(q.rti || []).join(', ') || 'none'}\nThreat: ${short(q.threat, L.sol ? 400 : 0)}\nVendor solution: ${short(q.solution, L.sol ? Math.max(L.sol * 3, 200) : 0) || 'none provided'}\nPatchable: ${q.patchable ? 'yes' : 'no'} | patch released: ${q.patchReleased || 'unknown'}\n${caveat}${intel}\nAffected assets (${assets.length}${assets.length > L.assets ? `, first ${L.assets} by criticality shown` : ''}):\n${assets.slice(0, L.assets).map(assetLine).join('\n')}\n\nTask: explain the risk in plain terms, then give a rollout plan across these assets: which to do first and why, batching by service role and OS, change risk, concrete steps per operating system family seen, what to do where no patch exists, and how to verify.`;
+                        return `Vulnerability: QID ${id} | ${short(q.title, 160)}\nCVEs: ${(q.cves || []).slice(0, L.cves + 4).map(c => `${c.id} (CVSS ${c.cvss || '?'})`).join(', ') || 'none'}${(q.cveCount || 0) > L.cves + 4 ? ` (+${q.cveCount - L.cves - 4} more)` : ''}\nQualys real-time intelligence: ${(q.rti || []).join(', ') || 'none'}\nThreat: ${short(q.threat, L.sol ? 400 : 0)}\nVendor solution: ${short(q.solution, L.sol ? Math.max(L.sol * 3, 200) : 0) || 'none provided'}\nPatchable: ${q.patchable ? 'yes' : 'no'} | patch released: ${q.patchReleased || 'unknown'}\n${famNote}${caveat}${intel}\nAffected assets (${assets.length}${assets.length > L.assets ? `, first ${L.assets} by criticality shown` : ''}):\n${assets.slice(0, L.assets).map(assetLine).join('\n')}\n\nTask: explain the risk in plain terms, then give a rollout plan across these assets: which to do first and why, batching by service role and OS, change risk, concrete steps per operating system family seen, what to do where no patch exists, and how to verify.`;
                     }
                     const ctx = this.reportCtx || { groups: [], assets: [], dets: [], inScope: [], scope: 'ALL' };
                     const t1 = ctx.dets.filter(d => d.tier === 1).length;
-                    return `Team report scope: ${ctx.scope === 'ALL' ? 'whole estate' : ctx.scope + ' team'}.\n${caveat}Assets with findings: ${ctx.assets.length} of ${ctx.inScope.length} in scope. Open detections: ${ctx.dets.length}. Fix-now (known exploited) detections: ${t1}. Distinct fixes: ${ctx.groups.length}.\n\nTop fixes (ranked by priority, then assets affected x QVS):\n${ctx.groups.slice(0, Math.min(L.groups, 15)).map(g => groupLine(g, L)).join('\n')}\n\nHighest-risk assets (criticality, then TruRisk):\n${ctx.assets.slice(0, Math.max(3, Math.min(10, L.assets))).map(a => `${assetLine(a.name)} | detections ${a.detections} | fix-now ${a.t1}`).join('\n')}\n${intel}\nTask: write a 30-day remediation plan for this team, week by week. Say what to patch first and why, how to batch the work by service role to limit outage risk, what needs a risk acceptance or compensating control, and which data gaps to close.`;
+                    return `Team report scope: ${ctx.scope === 'ALL' ? 'whole estate' : ctx.scope + ' team'}.\n${caveat}Assets with findings: ${ctx.assets.length} of ${ctx.inScope.length} in scope. Open detections: ${ctx.dets.length}. Fix-now (known exploited) detections: ${t1}. Distinct fixes: ${ctx.groups.length} (${groupsFor.length} rows after folding repeated updates for the same product).\n\nTop fixes (ranked by priority, then assets affected x QVS):\n${groupsFor.slice(0, Math.min(L.groups, 15)).map(g => groupLine(g, L)).join('\n')}\n\nHighest-risk assets (criticality, then TruRisk):\n${ctx.assets.slice(0, Math.max(3, Math.min(10, L.assets))).map(a => `${assetLine(a.name)} | detections ${a.detections} | fix-now ${a.t1}`).join('\n')}\n${intel}\nTask: write a 30-day remediation plan for this team, week by week. Say what to patch first and why, how to batch the work by service role to limit outage risk, what needs a risk acceptance or compensating control, and which data gaps to close.`;
                 };
                 return { make, anon, research };
             }
