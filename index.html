@@ -262,6 +262,7 @@
                 
                 <div id="vuln-import-progress" class="hidden bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm">
                     <h4 class="font-bold text-blue-800 mb-2">Importing & Aggregating Vulnerabilities...</h4>
+                    <div id="vuln-header-info" class="text-xs text-blue-700 font-mono mb-3">Scanning for header...</div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>Rows Processed: <span id="vuln-prog-rows" class="font-bold">0</span></div>
                         <div>Assets Matched: <span id="vuln-prog-matched" class="font-bold text-emerald-600">0</span></div>
@@ -1008,6 +1009,7 @@
                 if (!file) return;
 
                 document.getElementById('vuln-import-progress').classList.remove('hidden');
+                document.getElementById('vuln-header-info').textContent = "Scanning for header...";
                 
                 let rowsProcessed = 0, findingsAggregated = 0;
                 const uniqueAssetsMatched = new Set();
@@ -1025,16 +1027,42 @@
                 const serviceSummary = {};
                 const cveSummary = {};
 
+                let headerFound = false;
+                let headerRow = [];
+                let headerRowIndex = -1;
+                let scanIndex = 0;
+
                 Papa.parse(file, { 
-                    header: true, 
+                    header: false, 
                     skipEmptyLines: true, 
                     step: (results) => {
+                        scanIndex++;
+                        const rawRow = results.data;
+
+                        if (!headerFound) {
+                            if (scanIndex <= 50) {
+                                const rowStr = rawRow.map(String).map(s => s.toLowerCase().trim());
+                                if (rowStr.some(c => c === 'qid') && rowStr.some(c => c.includes('severity')) && rowStr.some(c => c.includes('asset'))) {
+                                    headerFound = true;
+                                    headerRow = rawRow;
+                                    headerRowIndex = scanIndex;
+                                    document.getElementById('vuln-header-info').textContent = `Detected Vulnerability Header Row: ${headerRowIndex}`;
+                                }
+                            }
+                            return; // Skip metadata rows and the header row itself
+                        }
+
                         rowsProcessed++;
                         if (rowsProcessed % 1000 === 0) {
                             document.getElementById('vuln-prog-rows').textContent = rowsProcessed;
                         }
                         
-                        const r = results.data;
+                        // Map the streamed array to an object using our detected header
+                        const r = {};
+                        headerRow.forEach((h, i) => {
+                            r[h] = rawRow[i];
+                        });
+
                         const safeGet = (keys) => {
                             for (let k of keys) {
                                 let found = Object.keys(r).find(key => key.toLowerCase().trim() === k.toLowerCase());
@@ -1107,6 +1135,12 @@
                         }
                     },
                     complete: () => {
+                        console.log(`[Vuln Import] Complete.`);
+                        console.log(`[Vuln Import] Header Row Found: ${headerRowIndex}`);
+                        console.log(`[Vuln Import] Rows Processed: ${rowsProcessed}`);
+                        console.log(`[Vuln Import] Rows Correlated: ${findingsAggregated}`);
+                        console.log(`[Vuln Import] Rows Skipped (Unmapped): ${rowsProcessed - findingsAggregated}`);
+
                         document.getElementById('vuln-prog-rows').textContent = rowsProcessed;
                         document.getElementById('vuln-prog-matched').textContent = uniqueAssetsMatched.size;
                         document.getElementById('vuln-prog-skipped').textContent = uniqueAssetsSkipped.size;
